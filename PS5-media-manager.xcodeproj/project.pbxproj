@@ -1,0 +1,578 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		A3E3BCDB2F1220BB008A457E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A3E3BCC52F1220B9008A457E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A3E3BCCC2F1220B9008A457E;
+			remoteInfo = "PS5-media-manager";
+		};
+		A3E3BCE52F1220BB008A457E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A3E3BCC52F1220B9008A457E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A3E3BCCC2F1220B9008A457E;
+			remoteInfo = "PS5-media-manager";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		A3E3BCCD2F1220B9008A457E /* PS5-media-manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "PS5-media-manager.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A3E3BCDA2F1220BB008A457E /* PS5-media-managerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "PS5-media-managerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A3E3BCE42F1220BB008A457E /* PS5-media-managerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "PS5-media-managerUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A3E3BCCF2F1220B9008A457E /* PS5-media-manager */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "PS5-media-manager";
+			sourceTree = "<group>";
+		};
+		A3E3BCDD2F1220BB008A457E /* PS5-media-managerTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "PS5-media-managerTests";
+			sourceTree = "<group>";
+		};
+		A3E3BCE72F1220BB008A457E /* PS5-media-managerUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "PS5-media-managerUITests";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A3E3BCCA2F1220B9008A457E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A3E3BCD72F1220BB008A457E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A3E3BCE12F1220BB008A457E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A3E3BCC42F1220B9008A457E = {
+			isa = PBXGroup;
+			children = (
+				A3E3BCCF2F1220B9008A457E /* PS5-media-manager */,
+				A3E3BCDD2F1220BB008A457E /* PS5-media-managerTests */,
+				A3E3BCE72F1220BB008A457E /* PS5-media-managerUITests */,
+				A3E3BCCE2F1220B9008A457E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A3E3BCCE2F1220B9008A457E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A3E3BCCD2F1220B9008A457E /* PS5-media-manager.app */,
+				A3E3BCDA2F1220BB008A457E /* PS5-media-managerTests.xctest */,
+				A3E3BCE42F1220BB008A457E /* PS5-media-managerUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A3E3BCCC2F1220B9008A457E /* PS5-media-manager */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A3E3BCEE2F1220BB008A457E /* Build configuration list for PBXNativeTarget "PS5-media-manager" */;
+			buildPhases = (
+				A3E3BCC92F1220B9008A457E /* Sources */,
+				A3E3BCCA2F1220B9008A457E /* Frameworks */,
+				A3E3BCCB2F1220B9008A457E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A3E3BCCF2F1220B9008A457E /* PS5-media-manager */,
+			);
+			name = "PS5-media-manager";
+			packageProductDependencies = (
+			);
+			productName = "PS5-media-manager";
+			productReference = A3E3BCCD2F1220B9008A457E /* PS5-media-manager.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A3E3BCD92F1220BB008A457E /* PS5-media-managerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A3E3BCF12F1220BB008A457E /* Build configuration list for PBXNativeTarget "PS5-media-managerTests" */;
+			buildPhases = (
+				A3E3BCD62F1220BB008A457E /* Sources */,
+				A3E3BCD72F1220BB008A457E /* Frameworks */,
+				A3E3BCD82F1220BB008A457E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A3E3BCDC2F1220BB008A457E /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A3E3BCDD2F1220BB008A457E /* PS5-media-managerTests */,
+			);
+			name = "PS5-media-managerTests";
+			packageProductDependencies = (
+			);
+			productName = "PS5-media-managerTests";
+			productReference = A3E3BCDA2F1220BB008A457E /* PS5-media-managerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A3E3BCE32F1220BB008A457E /* PS5-media-managerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A3E3BCF42F1220BB008A457E /* Build configuration list for PBXNativeTarget "PS5-media-managerUITests" */;
+			buildPhases = (
+				A3E3BCE02F1220BB008A457E /* Sources */,
+				A3E3BCE12F1220BB008A457E /* Frameworks */,
+				A3E3BCE22F1220BB008A457E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A3E3BCE62F1220BB008A457E /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A3E3BCE72F1220BB008A457E /* PS5-media-managerUITests */,
+			);
+			name = "PS5-media-managerUITests";
+			packageProductDependencies = (
+			);
+			productName = "PS5-media-managerUITests";
+			productReference = A3E3BCE42F1220BB008A457E /* PS5-media-managerUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A3E3BCC52F1220B9008A457E /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					A3E3BCCC2F1220B9008A457E = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					A3E3BCD92F1220BB008A457E = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = A3E3BCCC2F1220B9008A457E;
+					};
+					A3E3BCE32F1220BB008A457E = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = A3E3BCCC2F1220B9008A457E;
+					};
+				};
+			};
+			buildConfigurationList = A3E3BCC82F1220B9008A457E /* Build configuration list for PBXProject "PS5-media-manager" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A3E3BCC42F1220B9008A457E;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A3E3BCCE2F1220B9008A457E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A3E3BCCC2F1220B9008A457E /* PS5-media-manager */,
+				A3E3BCD92F1220BB008A457E /* PS5-media-managerTests */,
+				A3E3BCE32F1220BB008A457E /* PS5-media-managerUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A3E3BCCB2F1220B9008A457E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A3E3BCD82F1220BB008A457E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A3E3BCE22F1220BB008A457E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A3E3BCC92F1220B9008A457E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A3E3BCD62F1220BB008A457E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A3E3BCE02F1220BB008A457E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A3E3BCDC2F1220BB008A457E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A3E3BCCC2F1220B9008A457E /* PS5-media-manager */;
+			targetProxy = A3E3BCDB2F1220BB008A457E /* PBXContainerItemProxy */;
+		};
+		A3E3BCE62F1220BB008A457E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A3E3BCCC2F1220B9008A457E /* PS5-media-manager */;
+			targetProxy = A3E3BCE52F1220BB008A457E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		A3E3BCEC2F1220BB008A457E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 85RL838733;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A3E3BCED2F1220BB008A457E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 85RL838733;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		A3E3BCEF2F1220BB008A457E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 85RL838733;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Juhao73692.PS5-media-manager";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A3E3BCF02F1220BB008A457E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 85RL838733;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Juhao73692.PS5-media-manager";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		A3E3BCF22F1220BB008A457E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 85RL838733;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Juhao73692.PS5-media-managerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PS5-media-manager.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PS5-media-manager";
+			};
+			name = Debug;
+		};
+		A3E3BCF32F1220BB008A457E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 85RL838733;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Juhao73692.PS5-media-managerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PS5-media-manager.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PS5-media-manager";
+			};
+			name = Release;
+		};
+		A3E3BCF52F1220BB008A457E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 85RL838733;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Juhao73692.PS5-media-managerUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = "PS5-media-manager";
+			};
+			name = Debug;
+		};
+		A3E3BCF62F1220BB008A457E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 85RL838733;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.Juhao73692.PS5-media-managerUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = "PS5-media-manager";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A3E3BCC82F1220B9008A457E /* Build configuration list for PBXProject "PS5-media-manager" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A3E3BCEC2F1220BB008A457E /* Debug */,
+				A3E3BCED2F1220BB008A457E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A3E3BCEE2F1220BB008A457E /* Build configuration list for PBXNativeTarget "PS5-media-manager" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A3E3BCEF2F1220BB008A457E /* Debug */,
+				A3E3BCF02F1220BB008A457E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A3E3BCF12F1220BB008A457E /* Build configuration list for PBXNativeTarget "PS5-media-managerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A3E3BCF22F1220BB008A457E /* Debug */,
+				A3E3BCF32F1220BB008A457E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A3E3BCF42F1220BB008A457E /* Build configuration list for PBXNativeTarget "PS5-media-managerUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A3E3BCF52F1220BB008A457E /* Debug */,
+				A3E3BCF62F1220BB008A457E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A3E3BCC52F1220B9008A457E /* Project object */;
+}
