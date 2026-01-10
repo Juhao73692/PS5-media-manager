@@ -1,0 +1,49 @@
+# === Xcode ===
+.DS_Store
+*.swp
+*.lock
+
+# Build products
+build/
+DerivedData/
+*.xcarchive
+*.ipa
+
+# Xcode user settings
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+
+# Xcode workspace (keep shared data)
+*.xcworkspace
+!*.xcworkspace/contents.xcworkspacedata
+!*.xcworkspace/xcshareddata/
+
+# SwiftPM
+.build/
+.swiftpm/xcode/package.xcworkspace
+
+# SwiftUI previews
+*.preview-thumbnails
+
+# === Debug / Logs ===
+*.log
+
+# === Environment / Secrets ===
+.env
+.env.*
+
+# === Fastlane (if used) ===
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# === Playgrounds ===
+timeline.xctimeline
+playground.xcworkspace
+
+# === Crash reports ===
+*.dSYM
