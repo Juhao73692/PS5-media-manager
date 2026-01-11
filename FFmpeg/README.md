@@ -26,22 +26,28 @@ FFmpeg/
 ├── include/            # C header files for development
 └── lib/                # Pre-compiled .a files (Universal Binaries)
 ```
+
 ## 4. How to Reproduce this Build
+
 To manually rebuild the libraries (e.g., to change modules or update versions), follow these steps:
 
 * **Install Build Dependencies**:
-```
+
+```shell
 brew install nasm pkg-config
 ```
+
 * **Copy this `build.sh` to FFmpeg code folder**
 * **Run the Build Script**:
-```
+
+```shell
 chmod +x build.sh
 ./build.sh
 ```
+
 * **Copy the Static Libraries to `lib/`**
 * **Copy the headers to `include/`**
 
 ## 5. Acknowledgments
-This software uses code of FFmpeg licensed under the LGPLv2.1 and its source can be downloaded from the FFmpeg website.
 
+This software uses code of FFmpeg licensed under the LGPLv2.1 and its source can be downloaded from the FFmpeg website.
