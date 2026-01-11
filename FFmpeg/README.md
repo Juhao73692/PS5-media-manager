@@ -45,8 +45,10 @@ chmod +x build.sh
 ./build.sh
 ```
 
-* **Copy the Static Libraries to `lib/`**
-* **Copy the headers to `include/`**
+* **Then you can find the build outputs under the `build/` folder**
+
+* **Copy the Static Libraries to `FFmpeg/lib/`**
+* **Copy the headers to `FFmpeg/include/`**
 
 ## 5. Acknowledgments
 
