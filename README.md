@@ -16,7 +16,7 @@ See the [LICENSE](LICENSE) file in the root directory for the full license text.
 
 ### FFmpeg Usage & Compliance
 
-This project statically links to the **FFmpeg** multimedia framework (Version: `release/8.0`).
+This project statically links to the **FFmpeg** multimedia framework (Version: `n8.0.1`).
 
 To comply with the LGPLv2.1 requirements regarding static linking, we provide the following:
 
