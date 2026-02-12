@@ -25,5 +25,5 @@
 @interface FFmpegWrapper : NSObject
 
 - (void)printMediaInfo:(NSString *)filePath;
-- (void)transcodeToMOVWithInput:(NSString *)inputPath andOutput:(NSString *)outputPath;
+- (void)transcodeToMOVWithInput: (NSString *)inputPath andOutput: (NSString *)outputPath andBitrateFactor: (double)bitrateFactor;
 @end

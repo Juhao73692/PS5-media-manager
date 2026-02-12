@@ -77,7 +77,7 @@ int64_t calc_avg_bitrate(AVFormatContext *fmt, int v_stream_idx) {
     avformat_close_input(&fmtCtx);
 }
 
-- (void)transcodeToMOVWithInput:(NSString *)inputPath andOutput:(NSString *) outputPath {
+- (void)transcodeToMOVWithInput: (NSString *)inputPath andOutput: (NSString *)outputPath andBitrateFactor: (double)bitrateFactor{
     /*
      Note: 1920x1080 video from PS5 is actually 1920x1088 (1088 = 16*68)
            We should remove the extra 8p
@@ -117,8 +117,8 @@ int64_t calc_avg_bitrate(AVFormatContext *fmt, int v_stream_idx) {
             v_enc_ctx->height = v_dec_ctx->height == 1088? 1080: v_dec_ctx->height;
             v_enc_ctx->pix_fmt = AV_PIX_FMT_P010LE;
             int64_t av1_br = calc_avg_bitrate(ifmt_ctx, v_stream_idx);
-            // take 2.8x bitrate for hevc_videotoolbox
-            v_enc_ctx->bit_rate = av1_br * 28 / 10;
+            // determine the bitrate according to the factor
+            v_enc_ctx->bit_rate = (int64_t)(bitrateFactor * av1_br);
             
             // fix framerate
             // i'm confused why the framerate can't be fixed to 59.94
