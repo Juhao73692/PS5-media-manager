@@ -24,9 +24,20 @@ import SwiftUI
 
 @main
 struct PS5_media_managerApp: App {
+    @StateObject private var libraryStore = MediaLibraryStore()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environmentObject(libraryStore)
+        }
+        .commands {
+            CommandGroup(after: .newItem) {
+                Button("选择PS5文件夹") {
+                    libraryStore.selectPS5Folder()
+                }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
+            }
         }
     }
 }

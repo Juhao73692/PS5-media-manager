@@ -22,77 +22,52 @@
 
 import SwiftUI
 
-import SwiftUI
-internal import UniformTypeIdentifiers
-
 struct ContentView: View {
-    @State private var isProcessing = false
-    @State private var message = "准备就绪"
-    @State private var bitrateFactor: Double = 1.8
-    @State private var selectedVideoURL: URL? = nil
+    @EnvironmentObject private var libraryStore: MediaLibraryStore
     var body: some View {
-        VStack(spacing: 20) {
-            Text("PS5 Media Manager")
-                .font(.title)
-            
-            Picker("码率倍率", selection: $bitrateFactor) {
-                Text("低 (1.0x)").tag(1.0)
-                Text("标准 (1.8x)").tag(1.8)
-                Text("高 (2.8x)").tag(2.8)
-            }
-            .pickerStyle(SegmentedPickerStyle())
-            .frame(width: 300)
-            
-            Button("选择视频文件") {
-                let panel = NSOpenPanel()
-                panel.allowedContentTypes = [.movie, .video]
-                panel.allowsMultipleSelection = false
-                panel.canChooseDirectories = false
+        NavigationSplitView {
+            List(selection: $libraryStore.selectedNodeID) {
+                Section {
+                    Button("选择PS5文件夹") {
+                        libraryStore.selectPS5Folder()
+                    }
 
-                if panel.runModal() == .OK {
-                    selectedVideoURL = panel.url
-                    message = selectedVideoURL != nil ? "已选择文件" : "未选择文件"
-                }
-            }
-
-            Button("开始转码") {
-                guard let url = selectedVideoURL else {
-                    message = "请先选择视频文件"
-                    return
+                    if libraryStore.isScanning {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("正在扫描媒体库…")
+                        }
+                    } else {
+                        Text(libraryStore.statusMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
-                let videoPath = url.path
-                let homeDir = FileManager.default.homeDirectoryForCurrentUser
-                let outputDir = homeDir.appendingPathComponent("Movies/PS5-media-manager/converted")
-
-                let baseName = url.deletingPathExtension().lastPathComponent
-                let bitrateSuffix = String(format: "_%.1f", bitrateFactor)
-                let outputPath = outputDir
-                    .appendingPathComponent(baseName + bitrateSuffix)
-                    .appendingPathExtension("mov")
-                    .path
-
-                startConvert(videoPath: videoPath, outputPath: outputPath, bitrateFactor: bitrateFactor)
+                Section("媒体库") {
+                    if libraryStore.mediaTree.isEmpty {
+                        Text("未找到媒体文件")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        OutlineGroup(libraryStore.mediaTree, children: \.children) { node in
+                            Text(node.title)
+                                .tag(node.id)
+                        }
+                    }
+                }
             }
-            .disabled(isProcessing || selectedVideoURL == nil)
-            Text(message)
-            
-        }
-        .padding()
-    }
-    func startConvert(videoPath: String, outputPath: String, bitrateFactor: Double) {
-        isProcessing = true
-        message = "正在转码……"
-        Task.detached(priority: .userInitiated) {
-            FFmpegWrapper().transcodeToMOV(withInput: videoPath, andOutput: outputPath, andBitrateFactor: bitrateFactor)
-            await MainActor.run {
-                message = "任务完成！"
-                isProcessing = false
-            }
+            .listStyle(.sidebar)
+            .frame(minWidth: 240)
+        } detail: {
+            MediaPreviewView(item: libraryStore.selectedItem)
+                .padding()
         }
     }
+
 }
 
 #Preview {
     ContentView()
+        .environmentObject(MediaLibraryStore())
 }

@@ -40,6 +40,7 @@ enum MediaType {
 protocol MediaItem {
     var id: UUID { get }
     var type: MediaType { get }
+    var name: String { get }
     var filePath: URL { get }
 }
 
@@ -50,10 +51,12 @@ protocol PhotoItem: MediaItem {
 class JpegItem: PhotoItem {
     let id: UUID
     let type: MediaType
+    let name: String
     let filePath: URL
     init(filePath: URL) {
         self.id = UUID()
         self.type = .photo(.jpeg)
+        self.name = filePath.deletingPathExtension().lastPathComponent
         self.filePath = filePath
     }
 }
@@ -61,10 +64,12 @@ class JpegItem: PhotoItem {
 class PngItem: PhotoItem {
     let id: UUID
     let type: MediaType
+    let name: String
     let filePath: URL
     init(filePath: URL) {
         self.id = UUID()
         self.type = .photo(.png)
+        self.name = filePath.deletingPathExtension().lastPathComponent
         self.filePath = filePath
     }
 }
@@ -76,22 +81,50 @@ protocol VideoItem: MediaItem {
 class WebmItem: VideoItem {
     let id: UUID
     let type: MediaType
+    let name: String
     let filePath: URL
     let coverImage: PhotoItem?
     init(filePath: URL) {
         self.id = UUID()
         self.type = .video(.webm)
+        self.name = filePath.deletingPathExtension().lastPathComponent
         self.filePath = filePath
-        let pathWithoutExt = filePath.deletingPathExtension()
-        let jpegPath = pathWithoutExt.appendingPathExtension("jpeg")
-        let jpgPath = pathWithoutExt.appendingPathExtension("jpg")
-        if FileManager.default.fileExists(atPath: jpegPath.path()) {
-            self.coverImage = JpegItem(filePath: jpegPath)
-        } else if FileManager.default.fileExists(atPath: jpgPath.path()) {
-            self.coverImage = JpegItem(filePath: jpgPath)
-        } else {
-            self.coverImage = nil
+        self.coverImage = VideoItemCoverResolver.resolveCoverImage(for: filePath)
+    }
+}
+
+class Mp4Item: VideoItem {
+    let id: UUID
+    let type: MediaType
+    let name: String
+    let filePath: URL
+    let coverImage: PhotoItem?
+    init(filePath: URL) {
+        self.id = UUID()
+        self.type = .video(.mp4)
+        self.name = filePath.deletingPathExtension().lastPathComponent
+        self.filePath = filePath
+        self.coverImage = VideoItemCoverResolver.resolveCoverImage(for: filePath)
+    }
+}
+
+enum VideoItemCoverResolver {
+    static func resolveCoverImage(for videoURL: URL) -> PhotoItem? {
+        let pathWithoutExt = videoURL.deletingPathExtension()
+        let candidates: [(String, (URL) -> PhotoItem)] = [
+            ("jpg", { JpegItem(filePath: $0) }),
+            ("jpeg", { JpegItem(filePath: $0) }),
+            ("png", { PngItem(filePath: $0) })
+        ]
+
+        for (ext, builder) in candidates {
+            let candidateURL = pathWithoutExt.appendingPathExtension(ext)
+            if FileManager.default.fileExists(atPath: candidateURL.path) {
+                return builder(candidateURL)
+            }
         }
+
+        return nil
     }
 }
 
@@ -103,11 +136,44 @@ enum MediaItemFactory {
         case "webm":
             return WebmItem(filePath: filePath)
 
+        case "mp4":
+            return Mp4Item(filePath: filePath)
+
         case "jpg", "jpeg":
             return JpegItem(filePath: filePath)
 
+        case "png":
+            return PngItem(filePath: filePath)
+
         default:
             return nil
+        }
+    }
+}
+extension MediaItem {
+    var isVideo: Bool {
+        if case .video = type {
+            return true
+        }
+        return false
+    }
+
+    var typeLabel: String {
+        switch type {
+        case .video(let videoType):
+            switch videoType {
+            case .webm:
+                return "webm"
+            case .mp4:
+                return "mp4"
+            }
+        case .photo(let photoType):
+            switch photoType {
+            case .jpeg:
+                return "jpeg"
+            case .png:
+                return "png"
+            }
         }
     }
 }
