@@ -20,6 +20,7 @@
 //  along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+import CryptoKit
 import Foundation
 
 struct PS5MediaScanner {
@@ -81,11 +82,161 @@ struct PS5MediaScanner {
             }
 
             if !items.isEmpty {
-                let sorted = items.sorted { $0.filePath.path < $1.filePath.path }
+                let deduped = removeDuplicates(from: items)
+                let sorted = deduped.sorted { $0.filePath.path < $1.filePath.path }
                 groups.append(GameMediaGroup(title: gameFolderURL.lastPathComponent, items: sorted))
             }
         }
 
         return groups.sorted { $0.title < $1.title }
+    }
+
+    private static func removeDuplicates(from items: [MediaItem]) -> [MediaItem] {
+        var grouped: [String: [MediaItem]] = [:]
+        for item in items {
+            let key = normalizedKey(for: item)
+            grouped[key, default: []].append(item)
+        }
+
+        var result: [MediaItem] = []
+        for group in grouped.values {
+            if group.count == 1 {
+                result.append(group[0])
+                continue
+            }
+
+            let sortedGroup = group.sorted {
+                if $0.name.count != $1.name.count {
+                    return $0.name.count < $1.name.count
+                }
+                return $0.name < $1.name
+            }
+
+            var sizeCache: [URL: Int] = [:]
+            var hashCache: [URL: String] = [:]
+            var keepers: [MediaItem] = []
+
+            for item in sortedGroup {
+                guard let original = keepers.first else {
+                    keepers.append(item)
+                    continue
+                }
+
+                if !isSuspectedDuplicateName(item.name) && !isSuspectedDuplicateName(original.name) {
+                    keepers.append(item)
+                    continue
+                }
+
+                guard let originalSize = fileSize(for: original.filePath, cache: &sizeCache),
+                      let itemSize = fileSize(for: item.filePath, cache: &sizeCache) else {
+                    keepers.append(item)
+                    continue
+                }
+
+                if originalSize != itemSize {
+                    keepers.append(item)
+                    continue
+                }
+
+                guard let originalHash = edgeHash(for: original.filePath, size: originalSize, cache: &hashCache),
+                      let itemHash = edgeHash(for: item.filePath, size: itemSize, cache: &hashCache) else {
+                    keepers.append(item)
+                    continue
+                }
+
+                if originalHash == itemHash {
+                    if item.name.count < original.name.count {
+                        removeCoverImageIfNeeded(for: original)
+                        removeDuplicateVideoIfNeeded(for: original)
+                        keepers[0] = item
+                    } else if item.name.count == original.name.count && item.name < original.name {
+                        removeCoverImageIfNeeded(for: original)
+                        removeDuplicateVideoIfNeeded(for: original)
+                        keepers[0] = item
+                    } else {
+                        removeCoverImageIfNeeded(for: item)
+                        removeDuplicateVideoIfNeeded(for: item)
+                    }
+                } else {
+                    keepers.append(item)
+                }
+            }
+
+            result.append(contentsOf: keepers)
+        }
+
+        return result
+    }
+
+    private static func removeCoverImageIfNeeded(for item: MediaItem) {
+        guard let videoItem = item as? VideoItem,
+              let coverImage = videoItem.coverImage else {
+            return
+        }
+        try? FileManager.default.removeItem(at: coverImage.filePath)
+    }
+
+    private static func removeDuplicateVideoIfNeeded(for item: MediaItem) {
+        guard item is VideoItem else {
+            return
+        }
+        try? FileManager.default.removeItem(at: item.filePath)
+    }
+
+    private static func normalizedKey(for item: MediaItem) -> String {
+        let normalizedName = normalizedName(for: item.name)
+        let ext = item.filePath.pathExtension.lowercased()
+        return "\(normalizedName).\(ext)"
+    }
+
+    private static func normalizedName(for name: String) -> String {
+        if let range = name.range(of: "_\\d+$", options: .regularExpression) {
+            return String(name[..<range.lowerBound])
+        }
+        return name
+    }
+
+    private static func isSuspectedDuplicateName(_ name: String) -> Bool {
+        return name.range(of: "_\\d+$", options: .regularExpression) != nil
+    }
+
+    private static func fileSize(for url: URL, cache: inout [URL: Int]) -> Int? {
+        if let cached = cache[url] {
+            return cached
+        }
+        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
+        if let size {
+            cache[url] = size
+        }
+        return size
+    }
+
+    private static func edgeHash(for url: URL, size: Int, cache: inout [URL: String]) -> String? {
+        if let cached = cache[url] {
+            return cached
+        }
+        let chunkSize = min(4096, size)
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            return nil
+        }
+        defer { try? handle.close() }
+
+        let startData = (try? handle.read(upToCount: chunkSize)) ?? Data()
+        let tailOffset = max(0, size - chunkSize)
+        if size > chunkSize {
+            try? handle.seek(toOffset: UInt64(tailOffset))
+        } else {
+            try? handle.seek(toOffset: 0)
+        }
+        let endData = (try? handle.read(upToCount: chunkSize)) ?? Data()
+
+        var combined = Data()
+        combined.append(startData)
+        combined.append(endData)
+
+        let digest = SHA256.hash(data: combined)
+        let hash = digest.map { String(format: "%02x", $0) }.joined()
+        cache[url] = hash
+        return hash
     }
 }
