@@ -32,16 +32,14 @@ final class MediaLibraryStore: ObservableObject {
     @Published var selectedFolderURL: URL? = nil
     @Published var library: PS5MediaScanner.PS5MediaLibrary? = nil
     @Published var mediaTree: [MediaTreeNode] = []
-    @Published var selectedNodeID: UUID? = nil {
-        didSet {
-            if let id = selectedNodeID {
-                selectedItem = nodeLookup[id]?.item
-            } else {
-                selectedItem = nil
-            }
+    @Published var selectedNodeID: UUID? = nil
+
+    var selectedItem: MediaItem? {
+        guard let selectedNodeID else {
+            return nil
         }
+        return nodeLookup[selectedNodeID]?.item
     }
-    @Published var selectedItem: MediaItem? = nil
 
     private var nodeLookup: [UUID: MediaTreeNode] = [:]
 
@@ -64,6 +62,14 @@ final class MediaLibraryStore: ObservableObject {
         isScanning = true
         statusMessage = "正在扫描 \(folderURL.lastPathComponent)…"
         Task.detached(priority: .userInitiated) {
+            let isSecurityScoped = folderURL.startAccessingSecurityScopedResource()
+            defer {
+                if isSecurityScoped {
+                    folderURL.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            let timestampResult = FileTimestampSynchronizer.synchronizeRecursively(in: folderURL)
             let scannedLibrary = PS5MediaScanner.scanLibrary(rootURL: folderURL)
             let screenshotCount = scannedLibrary.screenshots.reduce(0) { $0 + $1.items.count }
             let videoCount = scannedLibrary.videoClips.reduce(0) { $0 + $1.items.count }
@@ -72,7 +78,7 @@ final class MediaLibraryStore: ObservableObject {
                 self.library = scannedLibrary
                 self.mediaTree = tree
                 self.nodeLookup = MediaTreeBuilder.buildLookup(from: tree)
-                self.statusMessage = "截图 \(screenshotCount) 张，视频 \(videoCount) 个"
+                self.statusMessage = "截图 \(screenshotCount) 张，视频 \(videoCount) 个，已更新 \(timestampResult.updatedCount) 个文件时间，跳过 \(timestampResult.skippedUnchangedCount) 个，失败 \(timestampResult.failedCount) 个"
                 self.isScanning = false
             }
         }

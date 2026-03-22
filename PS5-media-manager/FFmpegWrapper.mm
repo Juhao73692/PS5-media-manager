@@ -22,6 +22,68 @@
 
 #import "FFmpegWrapper.h"
 
+static NSDate *ExtractTimestampDateFromFileName(NSString *fileName) {
+    NSError *error = nil;
+    NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"(\\d{14})" options:0 error:&error];
+    if (error != nil) {
+        return nil;
+    }
+
+    NSTextCheckingResult *match = [regex firstMatchInString:fileName options:0 range:NSMakeRange(0, fileName.length)];
+    if (match == nil || match.numberOfRanges < 2) {
+        return nil;
+    }
+
+    NSString *timestamp = [fileName substringWithRange:[match rangeAtIndex:1]];
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    formatter.timeZone = [NSTimeZone localTimeZone];
+    formatter.dateFormat = @"yyyyMMddHHmmss";
+    return [formatter dateFromString:timestamp];
+}
+
+static void SynchronizeFileDatesForPath(NSString *path) {
+    NSDate *timestampDate = ExtractTimestampDateFromFileName([path lastPathComponent]);
+    if (timestampDate == nil) {
+        return;
+    }
+
+    NSDictionary<NSFileAttributeKey, id> *attributes = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil];
+    NSDate *currentModificationDate = attributes[NSFileModificationDate];
+    NSDate *currentCreationDate = attributes[NSFileCreationDate];
+    BOOL modificationMatches = currentModificationDate != nil && fabs([currentModificationDate timeIntervalSinceDate:timestampDate]) < 1.0;
+    BOOL creationMatches = currentCreationDate != nil && fabs([currentCreationDate timeIntervalSinceDate:timestampDate]) < 1.0;
+    if (modificationMatches && creationMatches) {
+        return;
+    }
+
+    NSError *error = nil;
+    BOOL updated = NO;
+    if (!modificationMatches) {
+        updated = [[NSFileManager defaultManager] setAttributes:@{
+            NSFileModificationDate: timestampDate
+        } ofItemAtPath:path error:&error];
+        if (error != nil) {
+            NSLog(@"Failed to update modification date for %@: %@", path, error);
+        }
+    }
+
+    error = nil;
+    BOOL created = NO;
+    if (!creationMatches) {
+        created = [[NSFileManager defaultManager] setAttributes:@{
+            NSFileCreationDate: timestampDate
+        } ofItemAtPath:path error:&error];
+        if (error != nil) {
+            NSLog(@"Failed to update creation date for %@: %@", path, error);
+        }
+    }
+
+    if (!updated && !created) {
+        NSLog(@"Failed to synchronize any file dates for %@", path);
+    }
+}
+
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
@@ -329,5 +391,6 @@ int64_t calc_avg_bitrate(AVFormatContext *fmt, int v_stream_idx) {
     }
 
     NSLog(@"Convert Finished");
+    SynchronizeFileDatesForPath(outputPath);
 }
 @end
