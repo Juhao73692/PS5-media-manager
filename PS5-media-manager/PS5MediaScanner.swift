@@ -24,17 +24,17 @@ import CryptoKit
 import Foundation
 
 struct PS5MediaScanner {
-    struct GameMediaGroup {
+    struct GameMediaGroup: Sendable {
         let title: String
         let items: [MediaItem]
     }
 
-    struct PS5MediaLibrary {
+    struct PS5MediaLibrary: Sendable {
         let screenshots: [GameMediaGroup]
         let videoClips: [GameMediaGroup]
     }
 
-    static func scanLibrary(rootURL: URL) -> PS5MediaLibrary {
+    nonisolated static func scanLibrary(rootURL: URL) -> PS5MediaLibrary {
         let createURL = rootURL.appendingPathComponent("CREATE")
         let screenshotsURL = createURL.appendingPathComponent("Screenshots")
         let videoClipsURL = createURL.appendingPathComponent("Video Clips")
@@ -44,7 +44,7 @@ struct PS5MediaScanner {
         return PS5MediaLibrary(screenshots: screenshots, videoClips: videoClips)
     }
 
-    private static func scanCategory(folderURL: URL, ignoreImage: Bool) -> [GameMediaGroup] {
+    nonisolated private static func scanCategory(folderURL: URL, ignoreImage: Bool) -> [GameMediaGroup] {
         guard let gameFolders = try? FileManager.default.contentsOfDirectory(
             at: folderURL,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -91,7 +91,7 @@ struct PS5MediaScanner {
         return groups.sorted { $0.title < $1.title }
     }
 
-    private static func removeDuplicates(from items: [MediaItem]) -> [MediaItem] {
+    nonisolated private static func removeDuplicates(from items: [MediaItem]) -> [MediaItem] {
         var grouped: [String: [MediaItem]] = [:]
         for item in items {
             let key = normalizedKey(for: item)
@@ -168,7 +168,7 @@ struct PS5MediaScanner {
         return result
     }
 
-    private static func removeCoverImageIfNeeded(for item: MediaItem) {
+    nonisolated private static func removeCoverImageIfNeeded(for item: MediaItem) {
         guard let videoItem = item as? VideoItem,
               let coverImage = videoItem.coverImage else {
             return
@@ -176,31 +176,31 @@ struct PS5MediaScanner {
         try? FileManager.default.removeItem(at: coverImage.filePath)
     }
 
-    private static func removeDuplicateVideoIfNeeded(for item: MediaItem) {
+    nonisolated private static func removeDuplicateVideoIfNeeded(for item: MediaItem) {
         guard item is VideoItem else {
             return
         }
         try? FileManager.default.removeItem(at: item.filePath)
     }
 
-    private static func normalizedKey(for item: MediaItem) -> String {
+    nonisolated private static func normalizedKey(for item: MediaItem) -> String {
         let normalizedName = normalizedName(for: item.name)
         let ext = item.filePath.pathExtension.lowercased()
         return "\(normalizedName).\(ext)"
     }
 
-    private static func normalizedName(for name: String) -> String {
+    nonisolated private static func normalizedName(for name: String) -> String {
         if let range = name.range(of: "_\\d+$", options: .regularExpression) {
             return String(name[..<range.lowerBound])
         }
         return name
     }
 
-    private static func isSuspectedDuplicateName(_ name: String) -> Bool {
+    nonisolated private static func isSuspectedDuplicateName(_ name: String) -> Bool {
         return name.range(of: "_\\d+$", options: .regularExpression) != nil
     }
 
-    private static func fileSize(for url: URL, cache: inout [URL: Int]) -> Int? {
+    nonisolated private static func fileSize(for url: URL, cache: inout [URL: Int]) -> Int? {
         if let cached = cache[url] {
             return cached
         }
@@ -211,7 +211,7 @@ struct PS5MediaScanner {
         return size
     }
 
-    private static func edgeHash(for url: URL, size: Int, cache: inout [URL: String]) -> String? {
+    nonisolated private static func edgeHash(for url: URL, size: Int, cache: inout [URL: String]) -> String? {
         if let cached = cache[url] {
             return cached
         }

@@ -22,7 +22,7 @@
 
 import Foundation
 
-enum MediaType {
+enum MediaType: Sendable {
     enum VideoType {
         case webm
         case mp4
@@ -37,23 +37,23 @@ enum MediaType {
     case photo(PhotoType)
 }
 
-protocol MediaItem {
-    var id: UUID { get }
-    var type: MediaType { get }
-    var name: String { get }
-    var filePath: URL { get }
+protocol MediaItem: Sendable {
+    nonisolated var id: UUID { get }
+    nonisolated var type: MediaType { get }
+    nonisolated var name: String { get }
+    nonisolated var filePath: URL { get }
 }
 
 protocol PhotoItem: MediaItem {
     
 }
 
-class JpegItem: PhotoItem {
+final class JpegItem: PhotoItem, @unchecked Sendable {
     let id: UUID
     let type: MediaType
     let name: String
     let filePath: URL
-    init(filePath: URL) {
+    nonisolated init(filePath: URL) {
         self.id = UUID()
         self.type = .photo(.jpeg)
         self.name = filePath.deletingPathExtension().lastPathComponent
@@ -61,12 +61,12 @@ class JpegItem: PhotoItem {
     }
 }
 
-class PngItem: PhotoItem {
+final class PngItem: PhotoItem, @unchecked Sendable {
     let id: UUID
     let type: MediaType
     let name: String
     let filePath: URL
-    init(filePath: URL) {
+    nonisolated init(filePath: URL) {
         self.id = UUID()
         self.type = .photo(.png)
         self.name = filePath.deletingPathExtension().lastPathComponent
@@ -75,16 +75,16 @@ class PngItem: PhotoItem {
 }
 
 protocol VideoItem: MediaItem {
-    var coverImage: PhotoItem? { get }
+    nonisolated var coverImage: PhotoItem? { get }
 }
 
-class WebmItem: VideoItem {
+final class WebmItem: VideoItem, @unchecked Sendable {
     let id: UUID
     let type: MediaType
     let name: String
     let filePath: URL
     let coverImage: PhotoItem?
-    init(filePath: URL) {
+    nonisolated init(filePath: URL) {
         self.id = UUID()
         self.type = .video(.webm)
         self.name = filePath.deletingPathExtension().lastPathComponent
@@ -93,13 +93,13 @@ class WebmItem: VideoItem {
     }
 }
 
-class Mp4Item: VideoItem {
+final class Mp4Item: VideoItem, @unchecked Sendable {
     let id: UUID
     let type: MediaType
     let name: String
     let filePath: URL
     let coverImage: PhotoItem?
-    init(filePath: URL) {
+    nonisolated init(filePath: URL) {
         self.id = UUID()
         self.type = .video(.mp4)
         self.name = filePath.deletingPathExtension().lastPathComponent
@@ -109,7 +109,7 @@ class Mp4Item: VideoItem {
 }
 
 enum VideoItemCoverResolver {
-    static func resolveCoverImage(for videoURL: URL) -> PhotoItem? {
+    nonisolated static func resolveCoverImage(for videoURL: URL) -> PhotoItem? {
         let pathWithoutExt = videoURL.deletingPathExtension()
         let candidates: [(String, (URL) -> PhotoItem)] = [
             ("jpg", { JpegItem(filePath: $0) }),
@@ -129,7 +129,7 @@ enum VideoItemCoverResolver {
 }
 
 enum MediaItemFactory {
-    static func create(from filePath: URL) -> MediaItem? {
+    nonisolated static func create(from filePath: URL) -> MediaItem? {
         let ext = filePath.pathExtension.lowercased()
 
         switch ext {
@@ -151,14 +151,14 @@ enum MediaItemFactory {
     }
 }
 extension MediaItem {
-    var isVideo: Bool {
+    nonisolated var isVideo: Bool {
         if case .video = type {
             return true
         }
         return false
     }
 
-    var typeLabel: String {
+    nonisolated var typeLabel: String {
         switch type {
         case .video(let videoType):
             switch videoType {

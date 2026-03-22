@@ -85,13 +85,13 @@ final class MediaLibraryStore: ObservableObject {
     }
 }
 
-struct MediaTreeNode: Identifiable, Hashable {
+struct MediaTreeNode: Identifiable, Hashable, Sendable {
     let id: UUID
     let title: String
     let item: MediaItem?
     let children: [MediaTreeNode]?
 
-    init(title: String, item: MediaItem? = nil, children: [MediaTreeNode]? = nil) {
+    nonisolated init(title: String, item: MediaItem? = nil, children: [MediaTreeNode]? = nil) {
         self.id = UUID()
         self.title = title
         self.item = item
@@ -108,7 +108,7 @@ struct MediaTreeNode: Identifiable, Hashable {
 }
 
 enum MediaTreeBuilder {
-    static func build(from library: PS5MediaScanner.PS5MediaLibrary) -> [MediaTreeNode] {
+    nonisolated static func build(from library: PS5MediaScanner.PS5MediaLibrary) -> [MediaTreeNode] {
         let screenshotNodes = library.screenshots.map { group in
             MediaTreeNode(
                 title: group.title,
@@ -139,7 +139,7 @@ enum MediaTreeBuilder {
         ]
     }
 
-    static func buildLookup(from nodes: [MediaTreeNode]) -> [UUID: MediaTreeNode] {
+    nonisolated static func buildLookup(from nodes: [MediaTreeNode]) -> [UUID: MediaTreeNode] {
         var lookup: [UUID: MediaTreeNode] = [:]
         for node in nodes {
             lookup[node.id] = node

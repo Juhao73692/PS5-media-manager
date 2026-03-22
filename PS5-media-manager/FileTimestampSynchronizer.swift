@@ -23,22 +23,25 @@
 import Foundation
 
 enum FileTimestampSynchronizer {
-    struct SynchronizationResult {
+    struct SynchronizationResult: Sendable {
         var updatedCount = 0
         var skippedUnchangedCount = 0
         var failedCount = 0
+
+        nonisolated init(
+            updatedCount: Int = 0,
+            skippedUnchangedCount: Int = 0,
+            failedCount: Int = 0
+        ) {
+            self.updatedCount = updatedCount
+            self.skippedUnchangedCount = skippedUnchangedCount
+            self.failedCount = failedCount
+        }
     }
 
-    private static let timestampRegex = try! NSRegularExpression(pattern: "(\\d{14})")
-    private static let timestampFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "yyyyMMddHHmmss"
-        return formatter
-    }()
+    nonisolated private static let timestampRegex = try! NSRegularExpression(pattern: "(\\d{14})")
 
-    static func synchronizeRecursively(in rootURL: URL) -> SynchronizationResult {
+    nonisolated static func synchronizeRecursively(in rootURL: URL) -> SynchronizationResult {
         guard let enumerator = FileManager.default.enumerator(
             at: rootURL,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -65,14 +68,14 @@ enum FileTimestampSynchronizer {
         return result
     }
 
-    enum SynchronizationOutcome {
+    enum SynchronizationOutcome: Sendable {
         case updated
         case skippedAlreadyMatched
         case failed
         case skippedNoTimestamp
     }
 
-    static func synchronizeFileDates(for fileURL: URL) -> SynchronizationOutcome {
+    nonisolated static func synchronizeFileDates(for fileURL: URL) -> SynchronizationOutcome {
         guard let timestampDate = extractTimestampDate(from: fileURL.lastPathComponent) else {
             return .skippedNoTimestamp
         }
@@ -109,7 +112,7 @@ enum FileTimestampSynchronizer {
         return updated ? .updated : .failed
     }
 
-    static func extractTimestampDate(from fileName: String) -> Date? {
+    nonisolated static func extractTimestampDate(from fileName: String) -> Date? {
         let range = NSRange(fileName.startIndex..<fileName.endIndex, in: fileName)
         guard let match = timestampRegex.firstMatch(in: fileName, options: [], range: range),
               match.numberOfRanges > 1,
@@ -117,10 +120,26 @@ enum FileTimestampSynchronizer {
             return nil
         }
 
-        return timestampFormatter.date(from: String(fileName[timestampRange]))
+        let timestamp = String(fileName[timestampRange])
+        guard timestamp.count == 14 else {
+            return nil
+        }
+
+        let components = DateComponents(
+            year: Int(timestamp.prefix(4)),
+            month: Int(timestamp.dropFirst(4).prefix(2)),
+            day: Int(timestamp.dropFirst(6).prefix(2)),
+            hour: Int(timestamp.dropFirst(8).prefix(2)),
+            minute: Int(timestamp.dropFirst(10).prefix(2)),
+            second: Int(timestamp.dropFirst(12).prefix(2))
+        )
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone.current
+        return calendar.date(from: components)
     }
 
-    private static func datesMatch(_ lhs: Date?, _ rhs: Date) -> Bool {
+    nonisolated private static func datesMatch(_ lhs: Date?, _ rhs: Date) -> Bool {
         guard let lhs else {
             return false
         }
