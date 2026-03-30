@@ -101,52 +101,7 @@ struct PS5_media_managerTests {
         }
     }
 
-    @Test func partialFileHasherUsesLeadingBytes() throws {
-        let fileManager = FileManager.default
-        let tempRoot = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try fileManager.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        defer { try? fileManager.removeItem(at: tempRoot) }
-
-        let firstURL = tempRoot.appendingPathComponent("first.bin")
-        let secondURL = tempRoot.appendingPathComponent("second.bin")
-        let leadingBytes = Data(repeating: 0x7A, count: ImportedMediaRegistry.defaultChunkSize)
-
-        try (leadingBytes + Data(repeating: 0x01, count: 128)).write(to: firstURL)
-        try (leadingBytes + Data(repeating: 0x02, count: 128)).write(to: secondURL)
-
-        let firstHash = try PartialFileHasher.hashFirstChunk(of: firstURL)
-        let secondHash = try PartialFileHasher.hashFirstChunk(of: secondURL)
-
-        #expect(firstHash == secondHash)
-    }
-
-    @Test func importedMediaRegistryPersistsAndFindsDuplicates() async throws {
-        let fileManager = FileManager.default
-        let tempRoot = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try fileManager.createDirectory(at: tempRoot, withIntermediateDirectories: true)
-        defer { try? fileManager.removeItem(at: tempRoot) }
-
-        let registryURL = tempRoot.appendingPathComponent("imported-media-registry.json")
-        let registry = ImportedMediaRegistry(storeURL: registryURL)
-
-        try await registry.recordImportedFile(
-            hash: "abc",
-            sourceFilePath: "/tmp/original.mp4",
-            isVideo: true,
-            chunkSize: ImportedMediaRegistry.defaultChunkSize
-        )
-
-        let reloadedRegistry = ImportedMediaRegistry(storeURL: registryURL)
-        let duplicate = await reloadedRegistry.findDuplicate(
-            forHash: "abc",
-            chunkSize: ImportedMediaRegistry.defaultChunkSize
-        )
-
-        #expect(duplicate?.existingFilePath == "/tmp/original.mp4")
-        #expect(duplicate?.chunkSize == ImportedMediaRegistry.defaultChunkSize)
-    }
-
-    @Test func scanLibraryRemovesDuplicateMedia() async throws {
+    @Test func scanDedupRemovesPrefixMatchedPngInSameFolder() throws {
         let fileManager = FileManager.default
         let tempRoot = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let screenshotsDir = tempRoot
@@ -154,83 +109,120 @@ struct PS5_media_managerTests {
             .appendingPathComponent("Screenshots")
             .appendingPathComponent("GameA")
         try fileManager.createDirectory(at: screenshotsDir, withIntermediateDirectories: true)
-
-        let data = Data(repeating: 0xAB, count: 3000)
-        let originalURL = screenshotsDir.appendingPathComponent("shot.jpg")
-        let duplicateURL = screenshotsDir.appendingPathComponent("shot_1.jpg")
-        try data.write(to: originalURL)
-        try data.write(to: duplicateURL)
-
         defer { try? fileManager.removeItem(at: tempRoot) }
+
+        let firstURL = screenshotsDir.appendingPathComponent("20200101100101_png_.png")
+        let secondURL = screenshotsDir.appendingPathComponent("20200101100101_png__1.png")
+        let sharedData = Data(repeating: 0x7A, count: 4096)
+        try sharedData.write(to: firstURL)
+        try sharedData.write(to: secondURL)
 
         let library = PS5MediaScanner.scanLibrary(rootURL: tempRoot)
         let gameGroup = try #require(library.screenshots.first)
-
         #expect(gameGroup.items.count == 1)
-        #expect(gameGroup.items.first?.name == "shot")
+        #expect(gameGroup.items.first?.name == "20200101100101_png_")
     }
 
-    @Test func scanLibraryHandlesManyVideosWithMixedDuplicates() async throws {
+    @Test func scanDedupKeepsSameFileAcrossDifferentFolders() throws {
+        let fileManager = FileManager.default
+        let tempRoot = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let gameA = tempRoot
+            .appendingPathComponent("CREATE")
+            .appendingPathComponent("Screenshots")
+            .appendingPathComponent("GameA")
+        let gameB = tempRoot
+            .appendingPathComponent("CREATE")
+            .appendingPathComponent("Screenshots")
+            .appendingPathComponent("GameB")
+        try fileManager.createDirectory(at: gameA, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: gameB, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempRoot) }
+
+        let sharedData = Data(repeating: 0x41, count: 2048)
+        try sharedData.write(to: gameA.appendingPathComponent("shot.png"))
+        try sharedData.write(to: gameB.appendingPathComponent("shot.png"))
+
+        let library = PS5MediaScanner.scanLibrary(rootURL: tempRoot)
+        #expect(library.screenshots.count == 2)
+        #expect(library.screenshots.allSatisfy { $0.items.count == 1 })
+    }
+
+    @Test func scanDedupUsesVideoEdgeHashForPrefixMatchedNames() throws {
         let fileManager = FileManager.default
         let tempRoot = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let videoDir = tempRoot
             .appendingPathComponent("CREATE")
             .appendingPathComponent("Video Clips")
-            .appendingPathComponent("BulkGame")
+            .appendingPathComponent("GameA")
         try fileManager.createDirectory(at: videoDir, withIntermediateDirectories: true)
-
-        let baseNames = (1...10).map { String(format: "clip%02d", $0) }
-        let trueDuplicateSet = Set(baseNames.prefix(7))
-        var expectedKeptNames: [String] = []
-
-        for name in baseNames {
-            let originalURL = videoDir.appendingPathComponent("\(name).mp4")
-            let duplicateURL = videoDir.appendingPathComponent("\(name)_1.mp4")
-            let originalCover = videoDir.appendingPathComponent("\(name).jpg")
-            let duplicateCover = videoDir.appendingPathComponent("\(name)_1.jpg")
-
-            let baseByte = UInt8(name.hashValue & 0xFF)
-            let originalData = Data(repeating: baseByte, count: 9000)
-            try originalData.write(to: originalURL)
-            try Data(repeating: baseByte ^ 0xFF, count: 200).write(to: originalCover)
-
-            if trueDuplicateSet.contains(name) {
-                try originalData.write(to: duplicateURL)
-                try Data(repeating: baseByte ^ 0xFF, count: 200).write(to: duplicateCover)
-                expectedKeptNames.append(name)
-            } else {
-                let differentData = Data(repeating: baseByte &+ 1, count: 9000)
-                try differentData.write(to: duplicateURL)
-                try Data(repeating: baseByte &+ 2, count: 200).write(to: duplicateCover)
-                expectedKeptNames.append(contentsOf: [name, "\(name)_1"])
-            }
-        }
-
         defer { try? fileManager.removeItem(at: tempRoot) }
+
+        let chunk = 1024 * 1024
+        let head = Data(repeating: 0x11, count: chunk)
+        let tail = Data(repeating: 0x22, count: chunk)
+        let middleA = Data(repeating: 0x33, count: 300_000)
+        let middleB = Data(repeating: 0x44, count: 300_000)
+
+        try (head + middleA + tail).write(to: videoDir.appendingPathComponent("clip.mp4"))
+        try (head + middleB + tail).write(to: videoDir.appendingPathComponent("clip_1.mp4"))
 
         let library = PS5MediaScanner.scanLibrary(rootURL: tempRoot)
         let gameGroup = try #require(library.videoClips.first)
-        let returnedNames = Set(gameGroup.items.map { $0.name })
+        #expect(gameGroup.items.count == 1)
+        #expect(gameGroup.items.first?.name == "clip")
+    }
 
-        #expect(returnedNames.count == expectedKeptNames.count)
-        #expect(returnedNames == Set(expectedKeptNames))
+    @Test func importDedupDetectsPrefixMatchedPngWithSameHash() async throws {
+        let fileManager = FileManager.default
+        let tempRoot = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempRoot) }
 
-        for name in baseNames {
-            let originalURL = videoDir.appendingPathComponent("\(name).mp4")
-            let duplicateURL = videoDir.appendingPathComponent("\(name)_1.mp4")
-            let originalCover = videoDir.appendingPathComponent("\(name).jpg")
-            let duplicateCover = videoDir.appendingPathComponent("\(name)_1.jpg")
-            #expect(fileManager.fileExists(atPath: originalCover.path))
-            if trueDuplicateSet.contains(name) {
-                #expect(fileManager.fileExists(atPath: originalURL.path))
-                #expect(!fileManager.fileExists(atPath: duplicateURL.path))
-                #expect(!fileManager.fileExists(atPath: duplicateCover.path))
-            } else {
-                #expect(fileManager.fileExists(atPath: originalURL.path))
-                #expect(fileManager.fileExists(atPath: duplicateURL.path))
-                #expect(fileManager.fileExists(atPath: duplicateCover.path))
-            }
-        }
+        let firstURL = tempRoot.appendingPathComponent("20200101100101_png_.png")
+        let secondURL = tempRoot.appendingPathComponent("20200101100101_png__1.png")
+        let sharedData = Data(repeating: 0x5A, count: ImportedMediaRegistry.defaultChunkSize * 3)
+        try sharedData.write(to: firstURL)
+        try sharedData.write(to: secondURL)
+
+        let firstHash = try PartialFileHasher.hashFirstAndLastChunk(of: firstURL)
+        let secondHash = try PartialFileHasher.hashFirstAndLastChunk(of: secondURL)
+        let registryURL = tempRoot.appendingPathComponent("imported-media-registry.json")
+        let registry = ImportedMediaRegistry(storeURL: registryURL)
+
+        try await registry.recordImportedFile(sourceURL: firstURL, hash: firstHash)
+        let duplicate = await registry.findDuplicate(forSourceURL: secondURL, hash: secondHash)
+
+        #expect(duplicate != nil)
+        #expect(duplicate?.existingFileName == "20200101100101_png_")
+        #expect(duplicate?.existingFileType == "png")
+    }
+
+    @Test func importDedupRequiresSameFileTypeAndSameHash() async throws {
+        let fileManager = FileManager.default
+        let tempRoot = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fileManager.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: tempRoot) }
+
+        let registryURL = tempRoot.appendingPathComponent("imported-media-registry.json")
+        let registry = ImportedMediaRegistry(storeURL: registryURL)
+        let recordedURL = tempRoot.appendingPathComponent("clip.mp4")
+        try Data(repeating: 0x2A, count: 100).write(to: recordedURL)
+        try await registry.recordImportedFile(sourceURL: recordedURL, hash: "hash-clip")
+
+        let sameNameDifferentType = tempRoot.appendingPathComponent("clip.jpg")
+        let sameNameDifferentHash = tempRoot.appendingPathComponent("clip_1.mp4")
+
+        let duplicateByType = await registry.findDuplicate(
+            forSourceURL: sameNameDifferentType,
+            hash: "hash-clip"
+        )
+        let duplicateByHash = await registry.findDuplicate(
+            forSourceURL: sameNameDifferentHash,
+            hash: "hash-other"
+        )
+
+        #expect(duplicateByType == nil)
+        #expect(duplicateByHash == nil)
     }
 
 }

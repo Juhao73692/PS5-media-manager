@@ -51,7 +51,7 @@ struct ContentView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         OutlineGroup(libraryStore.mediaTree, children: \.children) { node in
-                            Text(node.title)
+                            MediaTreeNodeRow(node: node)
                                 .tag(node.id)
                         }
                     }
@@ -60,11 +60,44 @@ struct ContentView: View {
             .listStyle(.sidebar)
             .frame(minWidth: 240)
         } detail: {
-            MediaPreviewView(item: libraryStore.selectedItem)
+            MediaPreviewView(
+                item: libraryStore.selectedItem,
+                selectedItems: libraryStore.selectedMediaItems
+            )
                 .padding()
         }
     }
 
+}
+
+private struct MediaTreeNodeRow: View {
+    @EnvironmentObject private var libraryStore: MediaLibraryStore
+    let node: MediaTreeNode
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button {
+                libraryStore.toggleSelection(for: node.id)
+            } label: {
+                Image(systemName: symbolName(for: libraryStore.selectionState(for: node.id)))
+                    .foregroundStyle(.primary)
+            }
+            .buttonStyle(.plain)
+
+            Text(node.title)
+        }
+    }
+
+    private func symbolName(for state: NodeSelectionState) -> String {
+        switch state {
+        case .none:
+            return "circle"
+        case .partial:
+            return "minus.circle.fill"
+        case .full:
+            return "checkmark.circle.fill"
+        }
+    }
 }
 
 #Preview {

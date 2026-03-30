@@ -33,6 +33,7 @@ final class MediaLibraryStore: ObservableObject {
     @Published var library: PS5MediaScanner.PS5MediaLibrary? = nil
     @Published var mediaTree: [MediaTreeNode] = []
     @Published var selectedNodeID: UUID? = nil
+    @Published var selectedMediaItemIDs: Set<UUID> = []
 
     var selectedItem: MediaItem? {
         guard let selectedNodeID else {
@@ -41,7 +42,13 @@ final class MediaLibraryStore: ObservableObject {
         return nodeLookup[selectedNodeID]?.item
     }
 
+    var selectedMediaItems: [MediaItem] {
+        selectedMediaItemIDs.compactMap { itemLookup[$0] }
+    }
+
     private var nodeLookup: [UUID: MediaTreeNode] = [:]
+    private var itemLookup: [UUID: MediaItem] = [:]
+    private var nodeDescendantItemIDs: [UUID: Set<UUID>] = [:]
 
     func selectPS5Folder() {
         let panel = NSOpenPanel()
@@ -78,11 +85,48 @@ final class MediaLibraryStore: ObservableObject {
                 self.library = scannedLibrary
                 self.mediaTree = tree
                 self.nodeLookup = MediaTreeBuilder.buildLookup(from: tree)
-                self.statusMessage = "截图 \(screenshotCount) 张，视频 \(videoCount) 个，已更新 \(timestampResult.updatedCount) 个文件时间，跳过 \(timestampResult.skippedUnchangedCount) 个，失败 \(timestampResult.failedCount) 个"
+                self.itemLookup = MediaTreeBuilder.buildItemLookup(from: tree)
+                self.nodeDescendantItemIDs = MediaTreeBuilder.buildDescendantItemIDs(from: tree)
+                self.selectedMediaItemIDs = self.selectedMediaItemIDs.intersection(Set(self.itemLookup.keys))
+//                self.statusMessage = "截图 \(screenshotCount) 张，视频 \(videoCount) 个，已更新 \(timestampResult.updatedCount) 个文件时间，跳过 \(timestampResult.skippedUnchangedCount) 个，失败 \(timestampResult.failedCount) 个"
+                self.statusMessage = ""
                 self.isScanning = false
             }
         }
     }
+
+    func selectionState(for nodeID: UUID) -> NodeSelectionState {
+        guard let itemIDs = nodeDescendantItemIDs[nodeID], !itemIDs.isEmpty else {
+            return .none
+        }
+
+        let selectedCount = itemIDs.intersection(selectedMediaItemIDs).count
+        if selectedCount == 0 {
+            return .none
+        }
+        if selectedCount == itemIDs.count {
+            return .full
+        }
+        return .partial
+    }
+
+    func toggleSelection(for nodeID: UUID) {
+        guard let itemIDs = nodeDescendantItemIDs[nodeID], !itemIDs.isEmpty else {
+            return
+        }
+
+        if itemIDs.isSubset(of: selectedMediaItemIDs) {
+            selectedMediaItemIDs.subtract(itemIDs)
+        } else {
+            selectedMediaItemIDs.formUnion(itemIDs)
+        }
+    }
+}
+
+enum NodeSelectionState {
+    case none
+    case partial
+    case full
 }
 
 struct MediaTreeNode: Identifiable, Hashable, Sendable {
@@ -151,5 +195,47 @@ enum MediaTreeBuilder {
             }
         }
         return lookup
+    }
+
+    nonisolated static func buildItemLookup(from nodes: [MediaTreeNode]) -> [UUID: MediaItem] {
+        var lookup: [UUID: MediaItem] = [:]
+        for node in nodes {
+            if let item = node.item {
+                lookup[item.id] = item
+            }
+            if let children = node.children {
+                let childLookup = buildItemLookup(from: children)
+                for (key, value) in childLookup {
+                    lookup[key] = value
+                }
+            }
+        }
+        return lookup
+    }
+
+    nonisolated static func buildDescendantItemIDs(from nodes: [MediaTreeNode]) -> [UUID: Set<UUID>] {
+        var lookup: [UUID: Set<UUID>] = [:]
+        for node in nodes {
+            _ = collectDescendantItemIDs(for: node, into: &lookup)
+        }
+        return lookup
+    }
+
+    nonisolated private static func collectDescendantItemIDs(
+        for node: MediaTreeNode,
+        into lookup: inout [UUID: Set<UUID>]
+    ) -> Set<UUID> {
+        var descendants: Set<UUID> = []
+        if let item = node.item {
+            descendants.insert(item.id)
+        }
+        if let children = node.children {
+            for child in children {
+                descendants.formUnion(collectDescendantItemIDs(for: child, into: &lookup))
+            }
+        }
+
+        lookup[node.id] = descendants
+        return descendants
     }
 }

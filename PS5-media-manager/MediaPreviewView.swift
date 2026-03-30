@@ -23,21 +23,62 @@
 import AppKit
 import AVFoundation
 import Combine
+import CryptoKit
 import Photos
 import SwiftUI
 import UniformTypeIdentifiers
 
 struct MediaPreviewView: View {
     let item: MediaItem?
+    let selectedItems: [MediaItem]
     @StateObject private var thumbnailLoader = VideoThumbnailLoader()
     @State private var isTranscoding = false
     @State private var transcodeStatusMessage: String? = nil
     @State private var isAddingToPhotos = false
     @State private var photoLibraryStatusMessage: String? = nil
+    @State private var isBatchTranscoding = false
+    @State private var batchTranscodeStatusMessage: String? = nil
+    @State private var isBatchAddingToPhotos = false
+    @State private var batchPhotoLibraryStatusMessage: String? = nil
     @State private var duplicateImportAlert: DuplicateImportAlertContext? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            if !selectedItems.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("已选媒体：\(selectedItems.count) 项")
+                        .font(.headline)
+
+                    HStack(spacing: 12) {
+                        Button(isBatchTranscoding ? "正在批量转码…" : "批量转码为 MOV（\(selectedVideoCount)）") {
+                            startBatchTranscode(for: selectedItems)
+                        }
+                        .disabled(isBatchTranscoding || selectedVideoCount == 0)
+
+                        if let batchTranscodeStatusMessage {
+                            Text(batchTranscodeStatusMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    HStack(spacing: 12) {
+                        Button(isBatchAddingToPhotos ? "正在批量导入…" : "批量添加至 Apple 相册") {
+                            addBatchToPhotos(for: selectedItems)
+                        }
+                        .disabled(isBatchAddingToPhotos)
+
+                        if let batchPhotoLibraryStatusMessage {
+                            Text(batchPhotoLibraryStatusMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                Divider()
+            }
+
             if let item = item {
                 Text(item.name)
                     .font(.title2)
@@ -133,7 +174,7 @@ struct MediaPreviewView: View {
                 photoLibraryStatusMessage = "已取消入库"
             }
         } message: { context in
-            Text("前 \(context.chunkSize) 字节哈希与已入库文件一致：\(context.existingFilePath)")
+            Text("文件名匹配，且前后 \(ImportedMediaRegistry.defaultChunkSize) 字节哈希与已入库文件一致：\(context.existingFileName).\(context.existingFileType)")
         }
     }
 
@@ -167,21 +208,24 @@ struct MediaPreviewView: View {
         let sourceURL = item.filePath
         Task.detached(priority: .userInitiated) {
             do {
-                let hash = try PartialFileHasher.hashFirstChunk(
+                let hash = try PartialFileHasher.hashFirstAndLastChunk(
                     of: sourceURL,
                     chunkSize: ImportedMediaRegistry.defaultChunkSize
                 )
                 if let duplicate = await ImportedMediaRegistry.shared.findDuplicate(
-                    forHash: hash,
-                    chunkSize: ImportedMediaRegistry.defaultChunkSize
+                    forSourceURL: sourceURL,
+                    hash: hash
                 ) {
+                    let currentFile = sourceURL.lastPathComponent
+                    let existingFile = "\(duplicate.existingFileName).\(duplicate.existingFileType)"
+                    print("[ImportDedup] detected duplicate: current=\(currentFile), existing=\(existingFile)")
                     await MainActor.run {
                         duplicateImportAlert = DuplicateImportAlertContext(
                             sourceURL: sourceURL,
                             isVideo: isVideo,
                             hash: hash,
-                            existingFilePath: duplicate.existingFilePath,
-                            chunkSize: duplicate.chunkSize
+                            existingFileName: duplicate.existingFileName,
+                            existingFileType: duplicate.existingFileType
                         )
                         photoLibraryStatusMessage = "检测到疑似重复，等待确认…"
                     }
@@ -194,6 +238,90 @@ struct MediaPreviewView: View {
                     isAddingToPhotos = false
                     photoLibraryStatusMessage = "导入失败：\(error.localizedDescription)"
                 }
+            }
+        }
+    }
+
+    private var selectedVideoCount: Int {
+        selectedItems.filter { $0.isVideo }.count
+    }
+
+    private func startBatchTranscode(for items: [MediaItem]) {
+        let videos = items.filter { $0.isVideo }
+        guard !videos.isEmpty else {
+            batchTranscodeStatusMessage = "当前选择中没有视频"
+            return
+        }
+
+        isBatchTranscoding = true
+        batchTranscodeStatusMessage = "准备批量转码…"
+
+        Task.detached(priority: .userInitiated) {
+            var successCount = 0
+            var failedCount = 0
+
+            for (index, video) in videos.enumerated() {
+                await MainActor.run {
+                    batchTranscodeStatusMessage = "正在转码 \(index + 1)/\(videos.count)：\(video.name)"
+                }
+
+                do {
+                    _ = try VideoTranscodePipeline.transcodeToManagedMovie(for: video.filePath)
+                    successCount += 1
+                } catch {
+                    failedCount += 1
+                }
+            }
+
+            let resultMessage = "批量转码完成：成功 \(successCount)，失败 \(failedCount)"
+            await MainActor.run {
+                isBatchTranscoding = false
+                batchTranscodeStatusMessage = resultMessage
+            }
+        }
+    }
+
+    private func addBatchToPhotos(for items: [MediaItem]) {
+        isBatchAddingToPhotos = true
+        batchPhotoLibraryStatusMessage = "准备批量导入 Apple 相册…"
+
+        Task.detached(priority: .userInitiated) {
+            var successCount = 0
+            var skippedCount = 0
+            var failedCount = 0
+
+            for (index, media) in items.enumerated() {
+                await MainActor.run {
+                    batchPhotoLibraryStatusMessage = "正在导入 \(index + 1)/\(items.count)：\(media.name)"
+                }
+
+                do {
+                    let hash = try PartialFileHasher.hashFirstAndLastChunk(
+                        of: media.filePath,
+                        chunkSize: ImportedMediaRegistry.defaultChunkSize
+                    )
+                    if let duplicate = await ImportedMediaRegistry.shared.findDuplicate(
+                        forSourceURL: media.filePath,
+                        hash: hash
+                    ) {
+                        let currentFile = media.filePath.lastPathComponent
+                        let existingFile = "\(duplicate.existingFileName).\(duplicate.existingFileType)"
+                        print("[ImportDedup] detected duplicate: current=\(currentFile), existing=\(existingFile)")
+                        skippedCount += 1
+                        continue
+                    }
+
+                    try await finalizeBatchPhotoImport(sourceURL: media.filePath, isVideo: media.isVideo, hash: hash)
+                    successCount += 1
+                } catch {
+                    failedCount += 1
+                }
+            }
+
+            let resultMessage = "批量导入完成：成功 \(successCount)，跳过重复 \(skippedCount)，失败 \(failedCount)"
+            await MainActor.run {
+                isBatchAddingToPhotos = false
+                batchPhotoLibraryStatusMessage = resultMessage
             }
         }
     }
@@ -238,20 +366,15 @@ struct MediaPreviewView: View {
         let shouldDeleteImportedFileAfterImport: Bool
 
         if isVideo {
-            importURL = try VideoTranscodePipeline.transcodeToManagedMovie(for: sourceURL)
+            importURL = try VideoTranscodePipeline.transcodeToPhotoImportCache(for: sourceURL)
             shouldDeleteImportedFileAfterImport = true
         } else {
             importURL = sourceURL
             shouldDeleteImportedFileAfterImport = false
         }
 
-        try await PhotoLibraryImporter.importMedia(at: importURL, isVideo: isVideo)
-        try await ImportedMediaRegistry.shared.recordImportedFile(
-            hash: hash,
-            sourceFilePath: sourceURL.path,
-            isVideo: isVideo,
-            chunkSize: ImportedMediaRegistry.defaultChunkSize
-        )
+//        try await PhotoLibraryImporter.importMedia(at: importURL, isVideo: isVideo)
+        try await ImportedMediaRegistry.shared.recordImportedFile(sourceURL: sourceURL, hash: hash)
         if shouldDeleteImportedFileAfterImport {
             try? FileManager.default.removeItem(at: importURL)
         }
@@ -261,6 +384,25 @@ struct MediaPreviewView: View {
             photoLibraryStatusMessage = "已添加到 Apple 相册"
         }
     }
+
+    nonisolated private func finalizeBatchPhotoImport(sourceURL: URL, isVideo: Bool, hash: String) async throws {
+        let importURL: URL
+        let shouldDeleteImportedFileAfterImport: Bool
+
+        if isVideo {
+            importURL = try VideoTranscodePipeline.transcodeToPhotoImportCache(for: sourceURL)
+            shouldDeleteImportedFileAfterImport = true
+        } else {
+            importURL = sourceURL
+            shouldDeleteImportedFileAfterImport = false
+        }
+
+        try await PhotoLibraryImporter.importMedia(at: importURL, isVideo: isVideo)
+        try await ImportedMediaRegistry.shared.recordImportedFile(sourceURL: sourceURL, hash: hash)
+        if shouldDeleteImportedFileAfterImport {
+            try? FileManager.default.removeItem(at: importURL)
+        }
+    }
 }
 
 struct DuplicateImportAlertContext: Identifiable {
@@ -268,13 +410,22 @@ struct DuplicateImportAlertContext: Identifiable {
     let sourceURL: URL
     let isVideo: Bool
     let hash: String
-    let existingFilePath: String
-    let chunkSize: Int
+    let existingFileName: String
+    let existingFileType: String
 }
 
 enum VideoTranscodePipeline {
     nonisolated static func transcodeToManagedMovie(for inputURL: URL) throws -> URL {
         let outputURL = try managedMovieOutputURL(for: inputURL)
+        return try transcode(inputURL: inputURL, outputURL: outputURL)
+    }
+
+    nonisolated static func transcodeToPhotoImportCache(for inputURL: URL) throws -> URL {
+        let outputURL = try photoImportCacheOutputURL(for: inputURL)
+        return try transcode(inputURL: inputURL, outputURL: outputURL)
+    }
+
+    nonisolated private static func transcode(inputURL: URL, outputURL: URL) throws -> URL {
         try createManagedMovieDirectoryIfNeeded(for: outputURL.deletingLastPathComponent())
 
         let inputAccess = inputURL.startAccessingSecurityScopedResource()
@@ -304,6 +455,50 @@ enum VideoTranscodePipeline {
             in: outputDirectory,
             preferredFileName: outputFileName
         )
+    }
+
+    nonisolated private static func photoImportCacheOutputURL(for inputURL: URL) throws -> URL {
+        let cacheRootDirectory = try importCacheRootDirectory()
+        let hash = cachePathHash(for: inputURL)
+        let levelOneDirectory = String(hash.prefix(2))
+        let levelTwoDirectory = String(hash.dropFirst(2).prefix(2))
+        let outputDirectory = cacheRootDirectory
+            .appendingPathComponent(levelOneDirectory, isDirectory: true)
+            .appendingPathComponent(levelTwoDirectory, isDirectory: true)
+            .appendingPathComponent(hash, isDirectory: true)
+        let outputFileName = inputURL.deletingPathExtension().lastPathComponent + ".mov"
+        return uniqueOutputURL(
+            in: outputDirectory,
+            preferredFileName: outputFileName
+        )
+    }
+
+    nonisolated private static func importCacheRootDirectory() throws -> URL {
+        let appSupportDirectory = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let appDirectoryName = (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackDirectoryName = Bundle.main.bundleIdentifier ?? "PS5-media-manager"
+        let resolvedDirectoryName = {
+            guard let appDirectoryName, !appDirectoryName.isEmpty else {
+                return fallbackDirectoryName
+            }
+            return appDirectoryName
+        }()
+        return appSupportDirectory
+            .appendingPathComponent(resolvedDirectoryName, isDirectory: true)
+            .appendingPathComponent("cache", isDirectory: true)
+    }
+
+    nonisolated private static func cachePathHash(for inputURL: URL) -> String {
+        let timestamp = UInt64(Date().timeIntervalSince1970 * 1000)
+        let rawValue = "\(timestamp)-\(inputURL.lastPathComponent)"
+        let digest = SHA256.hash(data: Data(rawValue.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     nonisolated private static func createManagedMovieDirectoryIfNeeded(for directoryURL: URL) throws {
