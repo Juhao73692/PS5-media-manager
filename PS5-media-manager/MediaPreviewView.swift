@@ -311,7 +311,11 @@ struct MediaPreviewView: View {
                         continue
                     }
 
-                    try await finalizeBatchPhotoImport(sourceURL: media.filePath, isVideo: media.isVideo, hash: hash)
+                    try await finalizeBatchPhotoImport(
+                        sourceURL: media.filePath,
+                        isVideo: media.isVideo,
+                        hash: hash
+                    )
                     successCount += 1
                 } catch {
                     failedCount += 1
@@ -362,22 +366,7 @@ struct MediaPreviewView: View {
     }
 
     nonisolated private func finalizePhotoImport(sourceURL: URL, isVideo: Bool, hash: String) async throws {
-        let importURL: URL
-        let shouldDeleteImportedFileAfterImport: Bool
-
-        if isVideo {
-            importURL = try VideoTranscodePipeline.transcodeToPhotoImportCache(for: sourceURL)
-            shouldDeleteImportedFileAfterImport = true
-        } else {
-            importURL = sourceURL
-            shouldDeleteImportedFileAfterImport = false
-        }
-
-//        try await PhotoLibraryImporter.importMedia(at: importURL, isVideo: isVideo)
-        try await ImportedMediaRegistry.shared.recordImportedFile(sourceURL: sourceURL, hash: hash)
-        if shouldDeleteImportedFileAfterImport {
-            try? FileManager.default.removeItem(at: importURL)
-        }
+        try await importMediaToPhotoLibrary(sourceURL: sourceURL, isVideo: isVideo, hash: hash)
 
         await MainActor.run {
             isAddingToPhotos = false
@@ -386,10 +375,15 @@ struct MediaPreviewView: View {
     }
 
     nonisolated private func finalizeBatchPhotoImport(sourceURL: URL, isVideo: Bool, hash: String) async throws {
+        try await importMediaToPhotoLibrary(sourceURL: sourceURL, isVideo: isVideo, hash: hash)
+    }
+
+    nonisolated private func importMediaToPhotoLibrary(sourceURL: URL, isVideo: Bool, hash: String) async throws {
         let importURL: URL
         let shouldDeleteImportedFileAfterImport: Bool
+        let needTranscode = shouldTranscodeForPhotoImport(sourceURL: sourceURL)
 
-        if isVideo {
+        if needTranscode {
             importURL = try VideoTranscodePipeline.transcodeToPhotoImportCache(for: sourceURL)
             shouldDeleteImportedFileAfterImport = true
         } else {
@@ -402,6 +396,10 @@ struct MediaPreviewView: View {
         if shouldDeleteImportedFileAfterImport {
             try? FileManager.default.removeItem(at: importURL)
         }
+    }
+
+    nonisolated private func shouldTranscodeForPhotoImport(sourceURL: URL) -> Bool {
+        sourceURL.pathExtension.lowercased() == "webm"
     }
 }
 
@@ -440,7 +438,7 @@ enum VideoTranscodePipeline {
         }
 
         let wrapper = FFmpegWrapper()
-        wrapper.transcodeToMOV(withInput: inputURL.path, andOutput: outputURL.path, andBitrateFactor: 1.0)
+        wrapper.transcodeHdrWebmToMov(withInput: inputURL.path, andOutput: outputURL.path, andBitrateFactor: 1.0)
         return outputURL
     }
 

@@ -161,7 +161,7 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
     avformat_close_input(&fmtCtx);
 }
 
--(void)transcodeToMOVWithInput: (NSString *)inputPath andOutput: (NSString *)outputPath andBitrateFactor: (double)bitrateFactor{
+-(void)transcodeHdrWebmToMovWithInput: (NSString *)inputPath andOutput: (NSString *)outputPath andBitrateFactor: (double)bitrateFactor{
     /*
      Note: 1920x1080 video from PS5 is actually 1920x1088 (1088 = 16*68)
            We should remove the extra 8p
