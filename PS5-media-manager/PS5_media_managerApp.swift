@@ -21,13 +21,21 @@
 //
 
 import SwiftUI
+import AppKit
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
+    }
+}
 
 @main
 struct PS5_media_managerApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var libraryStore = MediaLibraryStore()
 
     var body: some Scene {
-        WindowGroup {
+        Window("PS5 Media Manager", id: "main") {
             ContentView()
                 .environmentObject(libraryStore)
         }
