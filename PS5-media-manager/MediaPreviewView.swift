@@ -426,19 +426,24 @@ enum VideoTranscodePipeline {
     nonisolated private static func transcode(inputURL: URL, outputURL: URL) throws -> URL {
         try createManagedMovieDirectoryIfNeeded(for: outputURL.deletingLastPathComponent())
 
+        let outputDirectoryURL = outputURL.deletingLastPathComponent()
         let inputAccess = inputURL.startAccessingSecurityScopedResource()
-        let outputAccess = outputURL.startAccessingSecurityScopedResource()
+        let outputDirectoryAccess = outputDirectoryURL.startAccessingSecurityScopedResource()
         defer {
             if inputAccess {
                 inputURL.stopAccessingSecurityScopedResource()
             }
-            if outputAccess {
-                outputURL.stopAccessingSecurityScopedResource()
+            if outputDirectoryAccess {
+                outputDirectoryURL.stopAccessingSecurityScopedResource()
             }
         }
 
         let wrapper = FFmpegWrapper()
-        wrapper.transcodeHdrWebmToMov(withInput: inputURL.path, andOutput: outputURL.path, andBitrateFactor: 1.0)
+        wrapper.transcodeToMOV(
+            withInput: inputURL.path,
+            andOutput: outputURL.path,
+            andBitrateFactor: TranscodeSettings.selectedBitrateFactor
+        )
         return outputURL
     }
 
@@ -472,24 +477,7 @@ enum VideoTranscodePipeline {
     }
 
     nonisolated private static func importCacheRootDirectory() throws -> URL {
-        let appSupportDirectory = try FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        let appDirectoryName = (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let fallbackDirectoryName = Bundle.main.bundleIdentifier ?? "PS5-media-manager"
-        let resolvedDirectoryName = {
-            guard let appDirectoryName, !appDirectoryName.isEmpty else {
-                return fallbackDirectoryName
-            }
-            return appDirectoryName
-        }()
-        return appSupportDirectory
-            .appendingPathComponent(resolvedDirectoryName, isDirectory: true)
-            .appendingPathComponent("cache", isDirectory: true)
+        try TranscodeSettings.currentCacheRootDirectoryURL()
     }
 
     nonisolated private static func cachePathHash(for inputURL: URL) -> String {
