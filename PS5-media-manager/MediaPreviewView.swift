@@ -424,8 +424,6 @@ enum VideoTranscodePipeline {
     }
 
     nonisolated private static func transcode(inputURL: URL, outputURL: URL) throws -> URL {
-        try createManagedMovieDirectoryIfNeeded(for: outputURL.deletingLastPathComponent())
-
         let outputDirectoryURL = outputURL.deletingLastPathComponent()
         let inputAccess = inputURL.startAccessingSecurityScopedResource()
         let outputDirectoryAccess = outputDirectoryURL.startAccessingSecurityScopedResource()
@@ -437,6 +435,10 @@ enum VideoTranscodePipeline {
                 outputDirectoryURL.stopAccessingSecurityScopedResource()
             }
         }
+
+        // For security-scoped custom cache directories, access must be started
+        // before attempting to create intermediate folders.
+        try createManagedMovieDirectoryIfNeeded(for: outputDirectoryURL)
 
         let wrapper = FFmpegWrapper()
         wrapper.transcodeHdrWebmToMov(
