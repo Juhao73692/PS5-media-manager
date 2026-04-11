@@ -39,5 +39,9 @@ struct PS5_media_managerApp: App {
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             }
         }
+
+        Settings {
+            TranscodeSettingsView()
+        }
     }
 }
