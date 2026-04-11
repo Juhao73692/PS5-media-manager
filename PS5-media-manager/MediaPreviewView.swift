@@ -439,7 +439,7 @@ enum VideoTranscodePipeline {
         }
 
         let wrapper = FFmpegWrapper()
-        wrapper.transcodeToMOV(
+        wrapper.transcodeHdrWebmToMov(
             withInput: inputURL.path,
             andOutput: outputURL.path,
             andBitrateFactor: TranscodeSettings.selectedBitrateFactor
