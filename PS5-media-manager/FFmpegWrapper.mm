@@ -162,16 +162,12 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
 }
 
 -(void)transcodeHdrWebmToMovWithInput: (NSString *)inputPath andOutput: (NSString *)outputPath andBitrateFactor: (double)bitrateFactor{
-    /*
-     Note: 1920x1080 video from PS5 is actually 1920x1088 (1088 = 16*68)
-           We should remove the extra 8p
-     */
     AVFormatContext *ifmt_ctx = NULL, *ofmt_ctx = NULL;
     AVCodecContext *v_dec_ctx = NULL, *v_enc_ctx = NULL;
     AVCodecContext *a_dec_ctx = NULL, *a_enc_ctx = NULL;
-    struct SwsContext *sws_ctx = NULL;
     SwrContext *swr_ctx = NULL;
-    AVAudioFifo *fifo = NULL;
+    AVFilterGraph *filter_graph = NULL;
+    AVFilterContext *buffer_src_ctx = NULL, *crop_ctx = NULL, *format_ctx = NULL, *buffer_sink_ctx = NULL;
 
     int v_stream_idx = -1, a_stream_idx = -1;
     int out_v_idx = -1, out_a_idx = -1;
@@ -180,7 +176,6 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
     int64_t next_video_pts = 0;
     BOOL shouldProcess = YES;
 
-    // open input file
     int ret = avformat_open_input(&ifmt_ctx, [inputPath UTF8String], NULL, NULL);
     if (ret < 0) {
         NSLog(@"❌ Failed to open input file: %@ (ret=%d)", inputPath, ret);
@@ -193,7 +188,6 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
         return;
     }
 
-    // create context
     avformat_alloc_output_context2(&ofmt_ctx, NULL, "mov", [outputPath UTF8String]);
     if (ofmt_ctx == NULL) {
         NSLog(@"❌ Failed to create output context for %@", outputPath);
@@ -287,17 +281,6 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
                 continue;
             }
 
-            NSLog(@"video input coded=%dx%d visible=%dx%d fps=%d/%d bitrate=%lld maxrate=%s gop=%d",
-                  v_dec_ctx->width,
-                  v_dec_ctx->height,
-                  v_enc_ctx->width,
-                  v_enc_ctx->height,
-                  v_enc_ctx->framerate.num,
-                  v_enc_ctx->framerate.den,
-                  v_enc_ctx->bit_rate,
-                  br,
-                  v_enc_ctx->gop_size);
-
             AVStream *out_s = avformat_new_stream(ofmt_ctx, NULL);
             if (out_s == NULL) {
                 NSLog(@"❌ Failed to create output video stream");
@@ -312,11 +295,93 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
             out_s->time_base = v_enc_ctx->time_base;
             out_v_idx = out_s->index;
 
-            sws_ctx = sws_getContext(v_dec_ctx->width, v_enc_ctx->height, v_dec_ctx->pix_fmt,
-                                     v_enc_ctx->width, v_enc_ctx->height, v_enc_ctx->pix_fmt,
-                                     SWS_BICUBIC, NULL, NULL, NULL);
-            if (sws_ctx == NULL) {
-                NSLog(@"❌ Failed to create sws context for video conversion");
+            char args[1024];
+            AVRational sar = v_dec_ctx->sample_aspect_ratio.num > 0 && v_dec_ctx->sample_aspect_ratio.den > 0 ? v_dec_ctx->sample_aspect_ratio : (AVRational){1, 1};
+            AVRational video_tb = in_stream->time_base.num > 0 && in_stream->time_base.den > 0 ? in_stream->time_base : (AVRational){1, 1000};
+            snprintf(args,
+                     sizeof(args),
+                     "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d:colorspace=%d:range=%d",
+                     v_dec_ctx->width,
+                     v_dec_ctx->height,
+                     v_dec_ctx->pix_fmt,
+                     video_tb.num,
+                     video_tb.den,
+                     sar.num,
+                     sar.den,
+                     v_dec_ctx->colorspace,
+                     v_dec_ctx->color_range);
+
+            filter_graph = avfilter_graph_alloc();
+            if (filter_graph == NULL) {
+                NSLog(@"❌ Failed to allocate video filter graph");
+                continue;
+            }
+
+            ret = avfilter_graph_create_filter(&buffer_src_ctx,
+                                               avfilter_get_by_name("buffer"),
+                                               "in",
+                                               args,
+                                               NULL,
+                                               filter_graph);
+            if (ret < 0) {
+                NSLog(@"❌ Failed to create buffer source filter (ret=%d)", ret);
+                continue;
+            }
+
+            NSString *cropArgsString = (v_dec_ctx->width == 1920 && v_dec_ctx->height == 1088)
+                ? @"1920:1080:0:0"
+                : [NSString stringWithFormat:@"%d:%d:0:0", v_dec_ctx->width, v_dec_ctx->height];
+            ret = avfilter_graph_create_filter(&crop_ctx,
+                                               avfilter_get_by_name("crop"),
+                                               "crop",
+                                               [cropArgsString UTF8String],
+                                               NULL,
+                                               filter_graph);
+            if (ret < 0) {
+                NSLog(@"❌ Failed to create crop filter (ret=%d)", ret);
+                continue;
+            }
+
+            ret = avfilter_graph_create_filter(&format_ctx,
+                                               avfilter_get_by_name("format"),
+                                               "format",
+                                               "pix_fmts=p010le",
+                                               NULL,
+                                               filter_graph);
+            if (ret < 0) {
+                NSLog(@"❌ Failed to create format filter (ret=%d)", ret);
+                continue;
+            }
+
+            ret = avfilter_graph_create_filter(&buffer_sink_ctx,
+                                               avfilter_get_by_name("buffersink"),
+                                               "out",
+                                               NULL,
+                                               NULL,
+                                               filter_graph);
+            if (ret < 0) {
+                NSLog(@"❌ Failed to create buffer sink filter (ret=%d)", ret);
+                continue;
+            }
+
+            ret = avfilter_link(buffer_src_ctx, 0, crop_ctx, 0);
+            if (ret < 0) {
+                NSLog(@"❌ Failed to link buffer->crop (ret=%d)", ret);
+                continue;
+            }
+            ret = avfilter_link(crop_ctx, 0, format_ctx, 0);
+            if (ret < 0) {
+                NSLog(@"❌ Failed to link crop->format (ret=%d)", ret);
+                continue;
+            }
+            ret = avfilter_link(format_ctx, 0, buffer_sink_ctx, 0);
+            if (ret < 0) {
+                NSLog(@"❌ Failed to link format->sink (ret=%d)", ret);
+                continue;
+            }
+            ret = avfilter_graph_config(filter_graph, NULL);
+            if (ret < 0) {
+                NSLog(@"❌ Failed to configure video filter graph (ret=%d)", ret);
                 continue;
             }
         }
@@ -400,25 +465,18 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
                 NSLog(@"❌ Failed to initialize swr context (ret=%d)", ret);
                 continue;
             }
-
-            fifo = av_audio_fifo_alloc(a_enc_ctx->sample_fmt, a_enc_ctx->ch_layout.nb_channels, 1024 * 10);
-            if (fifo == NULL) {
-                NSLog(@"❌ Failed to allocate audio fifo");
-                continue;
-            }
         }
     }
 
-    if (v_dec_ctx == NULL || v_enc_ctx == NULL || sws_ctx == NULL || out_v_idx < 0) {
+    if (v_dec_ctx == NULL || v_enc_ctx == NULL || filter_graph == NULL || buffer_src_ctx == NULL || buffer_sink_ctx == NULL || out_v_idx < 0) {
         NSLog(@"❌ Video pipeline initialization failed for %@", inputPath);
         shouldProcess = NO;
     }
-    if (shouldProcess && a_stream_idx >= 0 && (a_dec_ctx == NULL || a_enc_ctx == NULL || swr_ctx == NULL || fifo == NULL || out_a_idx < 0)) {
+    if (shouldProcess && a_stream_idx >= 0 && (a_dec_ctx == NULL || a_enc_ctx == NULL || swr_ctx == NULL || out_a_idx < 0)) {
         NSLog(@"❌ Audio pipeline initialization failed for %@", inputPath);
         shouldProcess = NO;
     }
 
-    // open output file
     NSString *outputDir = [[outputPath stringByDeletingLastPathComponent] stringByStandardizingPath];
     NSFileManager *fm = [NSFileManager defaultManager];
     if (![fm fileExistsAtPath:outputDir]) {
@@ -431,7 +489,7 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
     }
     AVPacket *pkt = NULL;
     AVFrame *frame = NULL;
-    AVFrame *sw_frame = NULL;
+    AVFrame *filtered_frame = NULL;
 
     if (shouldProcess && !(ofmt_ctx->oformat->flags & AVFMT_NOFILE)) {
         ret = avio_open(&ofmt_ctx->pb, [outputPath UTF8String], AVIO_FLAG_WRITE);
@@ -453,14 +511,13 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
     if (shouldProcess) {
         pkt = av_packet_alloc();
         frame = av_frame_alloc();
-        sw_frame = av_frame_alloc();
-        if (pkt == NULL || frame == NULL || sw_frame == NULL) {
+        filtered_frame = av_frame_alloc();
+        if (pkt == NULL || frame == NULL || filtered_frame == NULL) {
             NSLog(@"❌ Failed to allocate packet/frame objects for transcoding");
             shouldProcess = NO;
         }
     }
 
-    // main loop for convert
     while (shouldProcess && av_read_frame(ifmt_ctx, pkt) >= 0) {
         if (pkt->stream_index == v_stream_idx) {
             ret = avcodec_send_packet(v_dec_ctx, pkt);
@@ -468,58 +525,50 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
                 NSLog(@"❌ avcodec_send_packet(video decoder) failed: %d", ret);
             } else {
                 while ((ret = avcodec_receive_frame(v_dec_ctx, frame)) == 0) {
-                    int crop_left = (int)frame->crop_left;
-                    int crop_top = (int)frame->crop_top;
-                    int visible_width = GetVisibleFrameWidth(frame, v_dec_ctx);
-                    int visible_height = GetVisibleFrameHeight(frame, v_dec_ctx);
-
-                    if (visible_width != v_enc_ctx->width || visible_height != v_enc_ctx->height) {
-                        NSLog(@"⚠️ visible frame size changed from %dx%d to %dx%d (coded=%dx%d crop l=%d r=%zu t=%d b=%zu)",
-                              v_enc_ctx->width,
-                              v_enc_ctx->height,
-                              visible_width,
-                              visible_height,
-                              frame->width,
-                              frame->height,
-                              crop_left,
-                              frame->crop_right,
-                              crop_top,
-                              frame->crop_bottom);
-                    }
-
-
-                    av_frame_unref(sw_frame);
-                    sw_frame->width = v_enc_ctx->width;
-                    sw_frame->height = v_enc_ctx->height;
-                    sw_frame->format = v_enc_ctx->pix_fmt;
-                    ret = av_frame_get_buffer(sw_frame, 0);
+                    ret = av_buffersrc_add_frame_flags(buffer_src_ctx, frame, AV_BUFFERSRC_FLAG_KEEP_REF);
                     if (ret < 0) {
-                        NSLog(@"❌ av_frame_get_buffer(video) failed: %d", ret);
+                        NSLog(@"❌ av_buffersrc_add_frame_flags failed: %d", ret);
+                        av_frame_unref(frame);
                         continue;
                     }
-                    ret = av_frame_make_writable(sw_frame);
+
+                    av_frame_unref(filtered_frame);
+                    ret = av_buffersink_get_frame(buffer_sink_ctx, filtered_frame);
                     if (ret < 0) {
-                        NSLog(@"❌ av_frame_make_writable(video) failed: %d", ret);
+                        NSLog(@"❌ av_buffersink_get_frame failed: %d", ret);
+                        av_frame_unref(frame);
                         continue;
                     }
 
-                    int actual_height = frame->height == 1088 ? 1080 : frame->height;
-
-                    ret = sws_scale(sws_ctx,
-                                    (const uint8_t *const *)frame->data,
-                                    frame->linesize,
-                                    0,
-                                    actual_height,
-                                    sw_frame->data,
-                                    sw_frame->linesize);
-                    if (ret <= 0) {
-                        NSLog(@"❌ sws_scale failed for video frame pts=%lld", frame->pts);
-                        continue;
+                    filtered_frame->color_range = frame->color_range != AVCOL_RANGE_UNSPECIFIED ? frame->color_range : v_dec_ctx->color_range;
+                    filtered_frame->color_primaries = frame->color_primaries != AVCOL_PRI_UNSPECIFIED ? frame->color_primaries : v_dec_ctx->color_primaries;
+                    filtered_frame->color_trc = frame->color_trc != AVCOL_TRC_UNSPECIFIED ? frame->color_trc : v_dec_ctx->color_trc;
+                    filtered_frame->colorspace = frame->colorspace != AVCOL_SPC_UNSPECIFIED ? frame->colorspace : v_dec_ctx->colorspace;
+                    filtered_frame->chroma_location = frame->chroma_location;
+                    av_frame_remove_side_data(filtered_frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA);
+                    av_frame_remove_side_data(filtered_frame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL);
+                    {
+                        const AVFrameSideData *side = av_frame_get_side_data(frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA);
+                        if (side != NULL) {
+                            AVFrameSideData *out_side = av_frame_new_side_data(filtered_frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA, side->size);
+                            if (out_side != NULL && out_side->data != NULL) {
+                                memcpy(out_side->data, side->data, side->size);
+                            }
+                        }
+                    }
+                    {
+                        const AVFrameSideData *side = av_frame_get_side_data(frame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL);
+                        if (side != NULL) {
+                            AVFrameSideData *out_side = av_frame_new_side_data(filtered_frame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL, side->size);
+                            if (out_side != NULL && out_side->data != NULL) {
+                                memcpy(out_side->data, side->data, side->size);
+                            }
+                        }
                     }
 
-                    sw_frame->pts = next_video_pts++;
+                    filtered_frame->pts = next_video_pts++;
 
-                    ret = avcodec_send_frame(v_enc_ctx, sw_frame);
+                    ret = avcodec_send_frame(v_enc_ctx, filtered_frame);
                     if (ret < 0) {
                         NSLog(@"❌ avcodec_send_frame(video encoder) failed: %d", ret);
                     } else {
@@ -542,6 +591,7 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
                             av_packet_free(&opkt);
                         }
                     }
+                    av_frame_unref(frame);
                 }
                 if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
                     NSLog(@"❌ avcodec_receive_frame(video decoder) failed: %d", ret);
@@ -553,50 +603,28 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
                 NSLog(@"❌ avcodec_send_packet(audio decoder) failed: %d", ret);
             } else {
                 while ((ret = avcodec_receive_frame(a_dec_ctx, frame)) == 0) {
-                    uint8_t **out_data = NULL;
-                    int out_linesize = 0;
-                    ret = av_samples_alloc_array_and_samples(&out_data,
-                                                             &out_linesize,
-                                                             a_enc_ctx->ch_layout.nb_channels,
-                                                             frame->nb_samples,
-                                                             a_enc_ctx->sample_fmt,
-                                                             0);
+                    ret = swr_convert_frame(swr_ctx, NULL, frame);
                     if (ret < 0) {
-                        NSLog(@"❌ av_samples_alloc_array_and_samples failed: %d", ret);
+                        NSLog(@"❌ swr_convert_frame(buffer input) failed: %d", ret);
+                        av_frame_unref(frame);
                         continue;
                     }
 
-                    ret = swr_convert(swr_ctx,
-                                      out_data,
-                                      frame->nb_samples,
-                                      (const uint8_t **)frame->data,
-                                      frame->nb_samples);
-                    if (ret < 0) {
-                        NSLog(@"❌ swr_convert failed: %d", ret);
-                        if (out_data != NULL) {
-                            av_freep(&out_data[0]);
-                            av_freep(&out_data);
+                    while (1) {
+                        int want = a_enc_ctx->frame_size > 0 ? a_enc_ctx->frame_size : 1024;
+                        int available = swr_get_out_samples(swr_ctx, 0);
+                        if (available < want) {
+                            break;
                         }
-                        continue;
-                    }
 
-                    ret = av_audio_fifo_write(fifo, (void **)out_data, frame->nb_samples);
-                    if (ret < frame->nb_samples) {
-                        NSLog(@"❌ av_audio_fifo_write wrote only %d of %d samples", ret, frame->nb_samples);
-                    }
-                    if (out_data != NULL) {
-                        av_freep(&out_data[0]);
-                        av_freep(&out_data);
-                    }
-
-                    while (av_audio_fifo_size(fifo) >= a_enc_ctx->frame_size) {
                         AVFrame *f_frame = av_frame_alloc();
                         if (f_frame == NULL) {
                             NSLog(@"❌ Failed to allocate audio frame for encoder");
                             break;
                         }
-                        f_frame->nb_samples = a_enc_ctx->frame_size;
+                        f_frame->nb_samples = want;
                         f_frame->format = a_enc_ctx->sample_fmt;
+                        f_frame->sample_rate = a_enc_ctx->sample_rate;
                         av_channel_layout_copy(&f_frame->ch_layout, &a_enc_ctx->ch_layout);
                         ret = av_frame_get_buffer(f_frame, 0);
                         if (ret < 0) {
@@ -604,12 +632,13 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
                             av_frame_free(&f_frame);
                             break;
                         }
-                        ret = av_audio_fifo_read(fifo, (void **)f_frame->data, a_enc_ctx->frame_size);
-                        if (ret < a_enc_ctx->frame_size) {
-                            NSLog(@"❌ av_audio_fifo_read read only %d of %d samples", ret, a_enc_ctx->frame_size);
+                        ret = swr_convert_frame(swr_ctx, f_frame, NULL);
+                        if (ret < 0) {
+                            NSLog(@"❌ swr_convert_frame(output) failed: %d", ret);
                             av_frame_free(&f_frame);
                             break;
                         }
+
                         f_frame->pts = next_audio_pts;
                         next_audio_pts += f_frame->nb_samples;
 
@@ -638,6 +667,7 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
                         }
                         av_frame_free(&f_frame);
                     }
+                    av_frame_unref(frame);
                 }
                 if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
                     NSLog(@"❌ avcodec_receive_frame(audio decoder) failed: %d", ret);
@@ -647,50 +677,124 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
         av_packet_unref(pkt);
     }
 
-    // process remained audio
-    if (shouldProcess && fifo && a_enc_ctx && out_a_idx >= 0 && av_audio_fifo_size(fifo) > 0) {
-        AVFrame *f_frame = av_frame_alloc();
-        if (f_frame != NULL) {
-            f_frame->nb_samples = av_audio_fifo_size(fifo);
-            f_frame->format = a_enc_ctx->sample_fmt;
-            av_channel_layout_copy(&f_frame->ch_layout, &a_enc_ctx->ch_layout);
-            ret = av_frame_get_buffer(f_frame, 0);
-            if (ret < 0) {
-                NSLog(@"❌ av_frame_get_buffer(audio flush) failed: %d", ret);
-            } else {
-                ret = av_audio_fifo_read(fifo, (void **)f_frame->data, f_frame->nb_samples);
-                if (ret < f_frame->nb_samples) {
-                    NSLog(@"❌ av_audio_fifo_read(audio flush) read only %d of %d samples", ret, f_frame->nb_samples);
-                } else {
-                    f_frame->pts = next_audio_pts;
-                    ret = avcodec_send_frame(a_enc_ctx, f_frame);
+    if (shouldProcess && a_dec_ctx != NULL && a_enc_ctx != NULL && swr_ctx != NULL && out_a_idx >= 0) {
+        ret = avcodec_send_packet(a_dec_ctx, NULL);
+        if (ret >= 0) {
+            while ((ret = avcodec_receive_frame(a_dec_ctx, frame)) == 0) {
+                ret = swr_convert_frame(swr_ctx, NULL, frame);
+                if (ret < 0) {
+                    av_frame_unref(frame);
+                    continue;
+                }
+                while (1) {
+                    int want = a_enc_ctx->frame_size > 0 ? a_enc_ctx->frame_size : 1024;
+                    int available = swr_get_out_samples(swr_ctx, 0);
+                    if (available < want) {
+                        break;
+                    }
+                    AVFrame *f_frame = av_frame_alloc();
+                    if (f_frame == NULL) {
+                        break;
+                    }
+                    f_frame->nb_samples = want;
+                    f_frame->format = a_enc_ctx->sample_fmt;
+                    f_frame->sample_rate = a_enc_ctx->sample_rate;
+                    av_channel_layout_copy(&f_frame->ch_layout, &a_enc_ctx->ch_layout);
+                    ret = av_frame_get_buffer(f_frame, 0);
                     if (ret < 0) {
-                        NSLog(@"❌ avcodec_send_frame(audio flush) failed: %d", ret);
-                    } else {
+                        av_frame_free(&f_frame);
+                        break;
+                    }
+                    ret = swr_convert_frame(swr_ctx, f_frame, NULL);
+                    if (ret < 0) {
+                        av_frame_free(&f_frame);
+                        break;
+                    }
+                    f_frame->pts = next_audio_pts;
+                    next_audio_pts += f_frame->nb_samples;
+                    ret = avcodec_send_frame(a_enc_ctx, f_frame);
+                    if (ret >= 0) {
                         AVPacket *opkt = av_packet_alloc();
                         if (opkt != NULL) {
                             while ((ret = avcodec_receive_packet(a_enc_ctx, opkt)) == 0) {
                                 av_packet_rescale_ts(opkt, a_enc_ctx->time_base, ofmt_ctx->streams[out_a_idx]->time_base);
                                 opkt->stream_index = out_a_idx;
                                 ret = av_interleaved_write_frame(ofmt_ctx, opkt);
-                                if (ret < 0) {
-                                    NSLog(@"❌ av_interleaved_write_frame(audio flush) failed: %d", ret);
-                                }
                                 av_packet_unref(opkt);
-                            }
-                            if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
-                                NSLog(@"❌ avcodec_receive_packet(audio flush) failed: %d", ret);
                             }
                             av_packet_free(&opkt);
                         }
                     }
+                    av_frame_free(&f_frame);
+                }
+                av_frame_unref(frame);
+            }
+        }
+
+        while (1) {
+            int delayed = swr_get_delay(swr_ctx, a_enc_ctx->sample_rate);
+            if (delayed <= 0) {
+                break;
+            }
+            AVFrame *f_frame = av_frame_alloc();
+            if (f_frame == NULL) {
+                break;
+            }
+            f_frame->nb_samples = FFMIN(delayed, a_enc_ctx->frame_size > 0 ? a_enc_ctx->frame_size : delayed);
+            f_frame->format = a_enc_ctx->sample_fmt;
+            f_frame->sample_rate = a_enc_ctx->sample_rate;
+            av_channel_layout_copy(&f_frame->ch_layout, &a_enc_ctx->ch_layout);
+            ret = av_frame_get_buffer(f_frame, 0);
+            if (ret < 0) {
+                av_frame_free(&f_frame);
+                break;
+            }
+            ret = swr_convert_frame(swr_ctx, f_frame, NULL);
+            if (ret < 0) {
+                av_frame_free(&f_frame);
+                break;
+            }
+            f_frame->pts = next_audio_pts;
+            next_audio_pts += f_frame->nb_samples;
+            ret = avcodec_send_frame(a_enc_ctx, f_frame);
+            if (ret >= 0) {
+                AVPacket *opkt = av_packet_alloc();
+                if (opkt != NULL) {
+                    while ((ret = avcodec_receive_packet(a_enc_ctx, opkt)) == 0) {
+                        av_packet_rescale_ts(opkt, a_enc_ctx->time_base, ofmt_ctx->streams[out_a_idx]->time_base);
+                        opkt->stream_index = out_a_idx;
+                        ret = av_interleaved_write_frame(ofmt_ctx, opkt);
+                        av_packet_unref(opkt);
+                    }
+                    av_packet_free(&opkt);
                 }
             }
             av_frame_free(&f_frame);
         }
+
+        ret = avcodec_send_frame(a_enc_ctx, NULL);
+        if (ret < 0) {
+            NSLog(@"❌ avcodec_send_frame(audio flush) failed: %d", ret);
+        } else {
+            AVPacket *opkt = av_packet_alloc();
+            if (opkt != NULL) {
+                while ((ret = avcodec_receive_packet(a_enc_ctx, opkt)) == 0) {
+                    av_packet_rescale_ts(opkt, a_enc_ctx->time_base, ofmt_ctx->streams[out_a_idx]->time_base);
+                    opkt->stream_index = out_a_idx;
+                    ret = av_interleaved_write_frame(ofmt_ctx, opkt);
+                    if (ret < 0) {
+                        NSLog(@"❌ av_interleaved_write_frame(audio flush) failed: %d", ret);
+                    }
+                    av_packet_unref(opkt);
+                }
+                if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
+                    NSLog(@"❌ avcodec_receive_packet(audio flush) failed: %d", ret);
+                }
+                av_packet_free(&opkt);
+            }
+        }
     }
 
-    // process remained video
     if (shouldProcess && v_enc_ctx != NULL && ofmt_ctx != NULL && out_v_idx >= 0) {
         ret = avcodec_send_frame(v_enc_ctx, NULL);
         if (ret < 0) {
@@ -720,16 +824,15 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
             NSLog(@"❌ av_write_trailer failed: %d", ret);
         }
     }
-    // clean
-    if (sws_ctx) sws_freeContext(sws_ctx);
+
     if (swr_ctx) swr_free(&swr_ctx);
-    if (fifo) av_audio_fifo_free(fifo);
+    if (filter_graph) avfilter_graph_free(&filter_graph);
     avcodec_free_context(&v_dec_ctx);
     avcodec_free_context(&v_enc_ctx);
     avcodec_free_context(&a_dec_ctx);
     avcodec_free_context(&a_enc_ctx);
     av_frame_free(&frame);
-    av_frame_free(&sw_frame);
+    av_frame_free(&filtered_frame);
     av_packet_free(&pkt);
     avformat_close_input(&ifmt_ctx);
     if (ofmt_ctx) {
@@ -740,4 +843,5 @@ static int GetVisibleFrameHeight(const AVFrame *frame, const AVCodecContext *dec
     NSLog(@"Convert Finished: %@", outputPath);
     SynchronizeFileDatesForPath(outputPath);
 }
+
 @end

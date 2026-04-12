@@ -13,6 +13,7 @@ rm -rf $PWD/build
   --enable-avformat \
   --enable-avcodec \
   --enable-avutil \
+  --enable-avfilter \
   --disable-gpl \
   --disable-nonfree \
   --cc=clang
