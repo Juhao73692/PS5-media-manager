@@ -47,6 +47,7 @@ enum TranscodeBitratePreset: String, CaseIterable, Identifiable {
 enum TranscodeSettings {
     nonisolated static let bitratePresetUserDefaultsKey = "transcode.bitratePreset"
     nonisolated static let cacheDirectoryBookmarkUserDefaultsKey = "transcode.cacheDirectoryBookmark"
+    nonisolated static let movieOutputDirectoryBookmarkUserDefaultsKey = "transcode.movieOutputDirectoryBookmark"
 
     nonisolated static let defaultBitratePreset: TranscodeBitratePreset = .low
 
@@ -96,6 +97,35 @@ enum TranscodeSettings {
         UserDefaults.standard.removeObject(forKey: cacheDirectoryBookmarkUserDefaultsKey)
     }
 
+    nonisolated static func resolvedMovieOutputDirectoryURL() throws -> URL? {
+        guard let bookmarkData = UserDefaults.standard.data(forKey: movieOutputDirectoryBookmarkUserDefaultsKey) else {
+            return nil
+        }
+
+        do {
+            return try resolveBookmarkData(
+                bookmarkData,
+                refreshingUserDefaultsKey: movieOutputDirectoryBookmarkUserDefaultsKey
+            )
+        } catch {
+            UserDefaults.standard.removeObject(forKey: movieOutputDirectoryBookmarkUserDefaultsKey)
+            return nil
+        }
+    }
+
+    nonisolated static func setMovieOutputDirectoryURL(_ directoryURL: URL) throws {
+        let bookmarkData = try directoryURL.bookmarkData(
+            options: [.withSecurityScope],
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+        UserDefaults.standard.set(bookmarkData, forKey: movieOutputDirectoryBookmarkUserDefaultsKey)
+    }
+
+    nonisolated static func clearMovieOutputDirectoryURL() {
+        UserDefaults.standard.removeObject(forKey: movieOutputDirectoryBookmarkUserDefaultsKey)
+    }
+
     nonisolated static func defaultCacheRootDirectoryURL() throws -> URL {
         let appSupportDirectory = try FileManager.default.url(
             for: .applicationSupportDirectory,
@@ -118,7 +148,10 @@ enum TranscodeSettings {
             .appendingPathComponent("cache", isDirectory: true)
     }
 
-    nonisolated private static func resolveBookmarkData(_ bookmarkData: Data) throws -> URL {
+    nonisolated private static func resolveBookmarkData(
+        _ bookmarkData: Data,
+        refreshingUserDefaultsKey: String = cacheDirectoryBookmarkUserDefaultsKey
+    ) throws -> URL {
         var isStale = false
         let resolvedURL = try URL(
             resolvingBookmarkData: bookmarkData,
@@ -128,7 +161,12 @@ enum TranscodeSettings {
         )
 
         if isStale {
-            try setCustomCacheRootDirectoryURL(resolvedURL)
+            let refreshedBookmarkData = try resolvedURL.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            UserDefaults.standard.set(refreshedBookmarkData, forKey: refreshingUserDefaultsKey)
         }
 
         return resolvedURL

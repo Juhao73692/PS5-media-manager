@@ -179,28 +179,52 @@ struct MediaPreviewView: View {
     }
 
     private func startTranscode(for item: MediaItem) {
-        isTranscoding = true
-        transcodeStatusMessage = "正在转码到影片目录…"
+        do {
+            guard let outputDirectoryURL = try DirectoryWriteAuthorization.movieOutputDirectory() else {
+                transcodeStatusMessage = "已取消选择输出文件夹"
+                return
+            }
 
-        let inputURL = item.filePath
-        Task.detached(priority: .userInitiated) {
-            do {
-                let outputURL = try VideoTranscodePipeline.transcodeToManagedMovie(for: inputURL)
+            isTranscoding = true
+            transcodeStatusMessage = "正在转码到所选文件夹…"
+            let inputURL = item.filePath
+            Task.detached(priority: .userInitiated) {
+                do {
+                    let outputURL = try VideoTranscodePipeline.transcodeToManagedMovie(
+                        for: inputURL,
+                        outputDirectoryURL: outputDirectoryURL
+                    )
 
-                await MainActor.run {
-                    isTranscoding = false
-                    transcodeStatusMessage = "已输出到 \(outputURL.path)"
-                }
-            } catch {
-                await MainActor.run {
-                    isTranscoding = false
-                    transcodeStatusMessage = "转码失败：\(error.localizedDescription)"
+                    await MainActor.run {
+                        isTranscoding = false
+                        transcodeStatusMessage = "已输出到 \(outputURL.path)"
+                    }
+                } catch {
+                    await MainActor.run {
+                        isTranscoding = false
+                        transcodeStatusMessage = "转码失败：\(error.localizedDescription)"
+                    }
                 }
             }
+        } catch {
+            isTranscoding = false
+            transcodeStatusMessage = "无法使用输出文件夹：\(error.localizedDescription)"
         }
     }
 
     private func addToPhotos(for item: MediaItem) {
+        if shouldTranscodeForPhotoImport(sourceURL: item.filePath) {
+            do {
+                guard try DirectoryWriteAuthorization.validateCustomCacheDirectoryIfNeeded() else {
+                    photoLibraryStatusMessage = "已取消 Cache 文件夹授权"
+                    return
+                }
+            } catch {
+                photoLibraryStatusMessage = "无法使用 Cache 文件夹：\(error.localizedDescription)"
+                return
+            }
+        }
+
         isAddingToPhotos = true
         let isVideo = item.isVideo
         photoLibraryStatusMessage = isVideo ? "正在转码并导入 Apple 相册…" : "正在导入 Apple 相册…"
@@ -253,9 +277,20 @@ struct MediaPreviewView: View {
             return
         }
 
+        let outputDirectoryURL: URL
+        do {
+            guard let authorizedDirectoryURL = try DirectoryWriteAuthorization.movieOutputDirectory() else {
+                batchTranscodeStatusMessage = "已取消选择输出文件夹"
+                return
+            }
+            outputDirectoryURL = authorizedDirectoryURL
+        } catch {
+            batchTranscodeStatusMessage = "无法使用输出文件夹：\(error.localizedDescription)"
+            return
+        }
+
         isBatchTranscoding = true
         batchTranscodeStatusMessage = "准备批量转码…"
-
         Task.detached(priority: .userInitiated) {
             var successCount = 0
             var failedCount = 0
@@ -266,7 +301,10 @@ struct MediaPreviewView: View {
                 }
 
                 do {
-                    _ = try VideoTranscodePipeline.transcodeToManagedMovie(for: video.filePath)
+                    _ = try VideoTranscodePipeline.transcodeToManagedMovie(
+                        for: video.filePath,
+                        outputDirectoryURL: outputDirectoryURL
+                    )
                     successCount += 1
                 } catch {
                     failedCount += 1
@@ -282,6 +320,18 @@ struct MediaPreviewView: View {
     }
 
     private func addBatchToPhotos(for items: [MediaItem]) {
+        if items.contains(where: { shouldTranscodeForPhotoImport(sourceURL: $0.filePath) }) {
+            do {
+                guard try DirectoryWriteAuthorization.validateCustomCacheDirectoryIfNeeded() else {
+                    batchPhotoLibraryStatusMessage = "已取消 Cache 文件夹授权"
+                    return
+                }
+            } catch {
+                batchPhotoLibraryStatusMessage = "无法使用 Cache 文件夹：\(error.localizedDescription)"
+                return
+            }
+        }
+
         isBatchAddingToPhotos = true
         batchPhotoLibraryStatusMessage = "准备批量导入 Apple 相册…"
 
@@ -340,6 +390,21 @@ struct MediaPreviewView: View {
     @MainActor
     private func continueDuplicateImport(with context: DuplicateImportAlertContext) {
         duplicateImportAlert = nil
+
+        if shouldTranscodeForPhotoImport(sourceURL: context.sourceURL) {
+            do {
+                guard try DirectoryWriteAuthorization.validateCustomCacheDirectoryIfNeeded() else {
+                    isAddingToPhotos = false
+                    photoLibraryStatusMessage = "已取消 Cache 文件夹授权"
+                    return
+                }
+            } catch {
+                isAddingToPhotos = false
+                photoLibraryStatusMessage = "无法使用 Cache 文件夹：\(error.localizedDescription)"
+                return
+            }
+        }
+
         photoLibraryStatusMessage = "继续导入重复媒体…"
 
         Task.detached(priority: .userInitiated) {
@@ -413,32 +478,56 @@ struct DuplicateImportAlertContext: Identifiable {
 }
 
 enum VideoTranscodePipeline {
-    nonisolated static func transcodeToManagedMovie(for inputURL: URL) throws -> URL {
-        let outputURL = try managedMovieOutputURL(for: inputURL)
-        return try transcode(inputURL: inputURL, outputURL: outputURL)
+    nonisolated static func transcodeToManagedMovie(
+        for inputURL: URL,
+        outputDirectoryURL: URL
+    ) throws -> URL {
+        return try transcode(
+            inputURL: inputURL,
+            outputDirectoryURL: outputDirectoryURL,
+            preferredFileName: inputURL.deletingPathExtension().lastPathComponent + ".mov",
+            outputAccessRootURL: outputDirectoryURL
+        )
     }
 
     nonisolated static func transcodeToPhotoImportCache(for inputURL: URL) throws -> URL {
-        let outputURL = try photoImportCacheOutputURL(for: inputURL)
-        return try transcode(inputURL: inputURL, outputURL: outputURL)
+        let cacheRootDirectory = try importCacheRootDirectory()
+        let outputDirectoryURL = photoImportCacheOutputDirectoryURL(
+            for: inputURL,
+            cacheRootDirectory: cacheRootDirectory
+        )
+        return try transcode(
+            inputURL: inputURL,
+            outputDirectoryURL: outputDirectoryURL,
+            preferredFileName: inputURL.deletingPathExtension().lastPathComponent + ".mov",
+            outputAccessRootURL: cacheRootDirectory
+        )
     }
 
-    nonisolated private static func transcode(inputURL: URL, outputURL: URL) throws -> URL {
-        let outputDirectoryURL = outputURL.deletingLastPathComponent()
+    nonisolated private static func transcode(
+        inputURL: URL,
+        outputDirectoryURL: URL,
+        preferredFileName: String,
+        outputAccessRootURL: URL
+    ) throws -> URL {
         let inputAccess = inputURL.startAccessingSecurityScopedResource()
-        let outputDirectoryAccess = outputDirectoryURL.startAccessingSecurityScopedResource()
+        let outputDirectoryAccess = outputAccessRootURL.startAccessingSecurityScopedResource()
         defer {
             if inputAccess {
                 inputURL.stopAccessingSecurityScopedResource()
             }
             if outputDirectoryAccess {
-                outputDirectoryURL.stopAccessingSecurityScopedResource()
+                outputAccessRootURL.stopAccessingSecurityScopedResource()
             }
         }
 
         // For security-scoped custom cache directories, access must be started
         // before attempting to create intermediate folders.
         try createManagedMovieDirectoryIfNeeded(for: outputDirectoryURL)
+        let outputURL = uniqueOutputURL(
+            in: outputDirectoryURL,
+            preferredFileName: preferredFileName
+        )
 
         let wrapper = FFmpegWrapper()
         wrapper.transcodeHdrWebmToMov(
@@ -449,33 +538,17 @@ enum VideoTranscodePipeline {
         return outputURL
     }
 
-    nonisolated private static func managedMovieOutputURL(for inputURL: URL) throws -> URL {
-        guard let moviesDirectory = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first else {
-            throw VideoTranscodePipelineError.moviesDirectoryUnavailable
-        }
-
-        let outputDirectory = moviesDirectory.appendingPathComponent("PS5 Media Manager", isDirectory: true)
-        let outputFileName = inputURL.deletingPathExtension().lastPathComponent + ".mov"
-        return uniqueOutputURL(
-            in: outputDirectory,
-            preferredFileName: outputFileName
-        )
-    }
-
-    nonisolated private static func photoImportCacheOutputURL(for inputURL: URL) throws -> URL {
-        let cacheRootDirectory = try importCacheRootDirectory()
+    nonisolated private static func photoImportCacheOutputDirectoryURL(
+        for inputURL: URL,
+        cacheRootDirectory: URL
+    ) -> URL {
         let hash = cachePathHash(for: inputURL)
         let levelOneDirectory = String(hash.prefix(2))
         let levelTwoDirectory = String(hash.dropFirst(2).prefix(2))
-        let outputDirectory = cacheRootDirectory
+        return cacheRootDirectory
             .appendingPathComponent(levelOneDirectory, isDirectory: true)
             .appendingPathComponent(levelTwoDirectory, isDirectory: true)
             .appendingPathComponent(hash, isDirectory: true)
-        let outputFileName = inputURL.deletingPathExtension().lastPathComponent + ".mov"
-        return uniqueOutputURL(
-            in: outputDirectory,
-            preferredFileName: outputFileName
-        )
     }
 
     nonisolated private static func importCacheRootDirectory() throws -> URL {
@@ -507,17 +580,6 @@ enum VideoTranscodePipeline {
         }
 
         return candidateURL
-    }
-}
-
-enum VideoTranscodePipelineError: LocalizedError {
-    case moviesDirectoryUnavailable
-
-    var errorDescription: String? {
-        switch self {
-        case .moviesDirectoryUnavailable:
-            return "无法定位 Movies 目录"
-        }
     }
 }
 

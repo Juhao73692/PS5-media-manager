@@ -58,6 +58,10 @@ final class MediaLibraryStore: ObservableObject {
         panel.canChooseFiles = false
 
         if panel.runModal() == .OK, let folderURL = panel.url {
+            guard DirectoryWriteAuthorization.isWritableDirectory(folderURL) else {
+                statusMessage = "所选文件夹不可写，无法同步文件时间或清理重复文件"
+                return
+            }
             selectedFolderURL = folderURL
             scanLibrary(at: folderURL)
         } else {
